@@ -1,9 +1,9 @@
-// banner.ts — Animated startup banner for `reeve run`
+// banner.ts — Animated startup banner for `goblin run`
 import { readFileSync } from 'fs';
 import { resolve, dirname } from 'path';
 import { readUpdateCache, shouldShowUpdateHint } from '../update-check';
 
-const REEVE_ROOT = resolve(dirname(new URL(import.meta.url).pathname), '../..');
+const GOBLIN_ROOT = resolve(dirname(new URL(import.meta.url).pathname), '../..');
 
 // ── ANSI helpers ────────────────────────────────────────
 const ESC = '\x1b[';
@@ -16,7 +16,7 @@ const RESET = `${ESC}0m`;
 // ── Load art ────────────────────────────────────────────
 function loadArt(): string[] {
   try {
-    const artPath = resolve(REEVE_ROOT, 'assets/logo.txt');
+    const artPath = resolve(GOBLIN_ROOT, 'assets/logo.txt');
     const raw = readFileSync(artPath, 'utf-8');
     return raw.split('\n');
   } catch {
@@ -97,10 +97,10 @@ export async function printAnimatedBanner(info: {
 
   const cache = readUpdateCache();
   if (shouldShowUpdateHint(info.version, cache)) {
-    lines.push(`${BOLD}reeve${RESET} v${info.version} ${DIM}→ ${cache!.latest} available${RESET}`);
-    lines.push(`${DIM}run ${RESET}${BOLD}reeve update${RESET}${DIM} to upgrade${RESET}`);
+    lines.push(`${BOLD}goblin${RESET} v${info.version} ${DIM}→ ${cache!.latest} available${RESET}`);
+    lines.push(`${DIM}run ${RESET}${BOLD}goblin update${RESET}${DIM} to upgrade${RESET}`);
   } else {
-    lines.push(`${BOLD}reeve${RESET} v${info.version}`);
+    lines.push(`${BOLD}goblin${RESET} v${info.version}`);
   }
 
   lines.push('');

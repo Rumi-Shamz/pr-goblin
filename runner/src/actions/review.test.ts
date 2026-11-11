@@ -9,10 +9,10 @@ import { readVerdict } from "./review"
 
 describe("readVerdict", () => {
   test("reads pass verdict from file", () => {
-    const dir = mkdtempSync(join(tmpdir(), "reeve-verdict-"))
+    const dir = mkdtempSync(join(tmpdir(), "goblin-verdict-"))
     try {
-      mkdirSync(join(dir, ".reeve"), { recursive: true })
-      writeFileSync(join(dir, ".reeve", "review-verdict.json"), '{"verdict":"pass"}')
+      mkdirSync(join(dir, ".pr-goblin"), { recursive: true })
+      writeFileSync(join(dir, ".pr-goblin", "review-verdict.json"), '{"verdict":"pass"}')
 
       expect(readVerdict(dir, 0)).toBe("pass")
     } finally {
@@ -21,10 +21,10 @@ describe("readVerdict", () => {
   })
 
   test("reads fail verdict from file", () => {
-    const dir = mkdtempSync(join(tmpdir(), "reeve-verdict-"))
+    const dir = mkdtempSync(join(tmpdir(), "goblin-verdict-"))
     try {
-      mkdirSync(join(dir, ".reeve"), { recursive: true })
-      writeFileSync(join(dir, ".reeve", "review-verdict.json"), '{"verdict":"fail"}')
+      mkdirSync(join(dir, ".pr-goblin"), { recursive: true })
+      writeFileSync(join(dir, ".pr-goblin", "review-verdict.json"), '{"verdict":"fail"}')
 
       expect(readVerdict(dir, 0)).toBe("fail")
     } finally {
@@ -33,10 +33,10 @@ describe("readVerdict", () => {
   })
 
   test("returns error for malformed verdict file", () => {
-    const dir = mkdtempSync(join(tmpdir(), "reeve-verdict-"))
+    const dir = mkdtempSync(join(tmpdir(), "goblin-verdict-"))
     try {
-      mkdirSync(join(dir, ".reeve"), { recursive: true })
-      writeFileSync(join(dir, ".reeve", "review-verdict.json"), "not json")
+      mkdirSync(join(dir, ".pr-goblin"), { recursive: true })
+      writeFileSync(join(dir, ".pr-goblin", "review-verdict.json"), "not json")
 
       expect(readVerdict(dir, 0)).toBe("error")
     } finally {
@@ -45,7 +45,7 @@ describe("readVerdict", () => {
   })
 
   test("assumes pass when no verdict file and exit code 0", () => {
-    const dir = mkdtempSync(join(tmpdir(), "reeve-verdict-"))
+    const dir = mkdtempSync(join(tmpdir(), "goblin-verdict-"))
     try {
       expect(readVerdict(dir, 0)).toBe("pass")
     } finally {
@@ -54,7 +54,7 @@ describe("readVerdict", () => {
   })
 
   test("returns error when no verdict file and non-zero exit", () => {
-    const dir = mkdtempSync(join(tmpdir(), "reeve-verdict-"))
+    const dir = mkdtempSync(join(tmpdir(), "goblin-verdict-"))
     try {
       expect(readVerdict(dir, 1)).toBe("error")
     } finally {

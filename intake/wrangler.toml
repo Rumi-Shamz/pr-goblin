@@ -1,4 +1,4 @@
-name = "bugpilot-worker"
+name = "pr-goblin-worker"
 main = "src/index.ts"
 compatibility_date = "2024-12-18"
 compatibility_flags = ["nodejs_compat"]
@@ -24,7 +24,7 @@ ALLOWED_ORIGIN = "*"
 #          wrangler secret put GITHUB_REPO --env br360
 #          wrangler secret put WEBHOOK_SECRET --env br360
 [env.br360]
-name = "bugpilot-br360"
+name = "pr-goblin-br360"
 [env.br360.vars]
 ALLOWED_ORIGIN = "https://www.businessreview360.au,https://demo-corp.businessreview360.au"
 
@@ -34,6 +34,6 @@ ALLOWED_ORIGIN = "https://www.businessreview360.au,https://demo-corp.businessrev
 #          wrangler secret put GITHUB_REPO --env groundwork
 #          wrangler secret put WEBHOOK_SECRET --env groundwork
 [env.groundwork]
-name = "bugpilot-groundwork"
+name = "pr-goblin-groundwork"
 [env.groundwork.vars]
 ALLOWED_ORIGIN = "https://groundwork.lunt.au"

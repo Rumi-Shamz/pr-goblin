@@ -8,7 +8,7 @@ import { cleanupTestTmp, testTmpDir } from "../test-helpers"
 const decoder = new TextDecoder()
 
 /** Isolated tasks dir — lives under .test-tmp, cleaned automatically */
-const TEST_TASKS_DIR = testTmpDir("reeve-tasks-")
+const TEST_TASKS_DIR = testTmpDir("goblin-tasks-")
 
 function runGit(cwd: string, args: string[]): string {
   const proc = Bun.spawnSync(["git", ...args], { cwd, stdout: "pipe", stderr: "pipe" })
@@ -25,8 +25,8 @@ function runGit(cwd: string, args: string[]): string {
 function createRepo(prefix: string): string {
   const repoDir = testTmpDir(prefix)
   runGit(repoDir, ["init", "-b", "main"])
-  runGit(repoDir, ["config", "user.name", "Reeve Test"])
-  runGit(repoDir, ["config", "user.email", "reeve@example.com"])
+  runGit(repoDir, ["config", "user.name", "Goblin Test"])
+  runGit(repoDir, ["config", "user.email", "goblin@example.com"])
   writeFileSync(join(repoDir, "README.md"), "seed\n")
   runGit(repoDir, ["add", "README.md"])
   runGit(repoDir, ["commit", "-m", "chore: initial"])
@@ -43,8 +43,8 @@ function createRepoWithOrigin(prefix: string): string {
 
   const workingDir = testTmpDir(`${prefix}working-`)
   Bun.spawnSync(["git", "clone", bareDir, workingDir], { stdout: "pipe", stderr: "pipe" })
-  runGit(workingDir, ["config", "user.name", "Reeve Test"])
-  runGit(workingDir, ["config", "user.email", "reeve@example.com"])
+  runGit(workingDir, ["config", "user.name", "Goblin Test"])
+  runGit(workingDir, ["config", "user.email", "goblin@example.com"])
   writeFileSync(join(workingDir, "README.md"), "seed\n")
   runGit(workingDir, ["add", "README.md"])
   runGit(workingDir, ["commit", "-m", "chore: initial"])
@@ -59,14 +59,14 @@ function createManager(): WorkspaceManager {
 
 describe("WorkspaceManager git failure handling", () => {
   test("fetchLatest: throws on git fetch failure", async (): Promise<void> => {
-    const repoDir = createRepo("reeve-workspace-fetch-")
+    const repoDir = createRepo("goblin-workspace-fetch-")
     const manager = createManager()
 
     await expect(manager.fetchLatest(repoDir)).rejects.toThrow("git fetch origin")
   })
 
   test("createForTask: throws on worktree add failure", async (): Promise<void> => {
-    const repoDir = createRepo("reeve-workspace-create-")
+    const repoDir = createRepo("goblin-workspace-create-")
     const manager = createManager()
 
     // No origin/main, so worktree add origin/main will fail
@@ -74,7 +74,7 @@ describe("WorkspaceManager git failure handling", () => {
   })
 
   test("removeForTask: throws on worktree remove failure", async (): Promise<void> => {
-    const repoDir = createRepo("reeve-workspace-remove-")
+    const repoDir = createRepo("goblin-workspace-remove-")
     const manager = createManager()
     const repoName = basename(repoDir)
 
@@ -91,7 +91,7 @@ describe("WorkspaceManager git failure handling", () => {
 
 describe("WorkspaceManager per-task layout", () => {
   test("createForTask: creates task dir with implement agent dir and repo-named worktree", async (): Promise<void> => {
-    const repoDir = createRepoWithOrigin("reeve-task-create-")
+    const repoDir = createRepoWithOrigin("goblin-task-create-")
     const manager = createManager()
     const repoName = basename(repoDir)
 
@@ -121,7 +121,7 @@ describe("WorkspaceManager per-task layout", () => {
   })
 
   test("createForTask reuse=true: returns created=false and refreshes context", async (): Promise<void> => {
-    const repoDir = createRepoWithOrigin("reeve-task-reuse-")
+    const repoDir = createRepoWithOrigin("goblin-task-reuse-")
     const manager = createManager()
 
     const first = await manager.createForTask("WOR-202", repoDir, "main")
@@ -143,7 +143,7 @@ describe("WorkspaceManager per-task layout", () => {
   })
 
   test("cleanWorktreeOnly: removes worktree but preserves agent dirs", async (): Promise<void> => {
-    const repoDir = createRepoWithOrigin("reeve-clean-wt-")
+    const repoDir = createRepoWithOrigin("goblin-clean-wt-")
     const manager = createManager()
     const repoName = basename(repoDir)
 
@@ -171,7 +171,7 @@ describe("WorkspaceManager per-task layout", () => {
   })
 
   test("removeForTask: removes entire task directory and branch", async (): Promise<void> => {
-    const repoDir = createRepoWithOrigin("reeve-task-remove-")
+    const repoDir = createRepoWithOrigin("goblin-task-remove-")
     const manager = createManager()
 
     const info = await manager.createForTask("WOR-203", repoDir, "main")

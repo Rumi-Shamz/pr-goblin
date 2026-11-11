@@ -4,25 +4,25 @@ import { tmpdir } from "os"
 import { join, resolve } from "path"
 
 import type { ActionContext } from "./types"
-import type { ReeveDaemonConfig } from "../config"
+import type { GoblinDaemonConfig } from "../config"
 import { executeAction } from "./registry"
 
 const createdDirs: string[] = []
 
 function createTempHome(): string {
-  const dir = mkdtempSync(join(tmpdir(), "reeve-actions-"))
+  const dir = mkdtempSync(join(tmpdir(), "goblin-actions-"))
   createdDirs.push(dir)
   return dir
 }
 
 function writeSettings(homeDir: string, settings: Record<string, unknown>): void {
-  const settingsDir = resolve(homeDir, ".reeve")
+  const settingsDir = resolve(homeDir, ".pr-goblin")
   mkdirSync(settingsDir, { recursive: true })
   writeFileSync(join(settingsDir, "settings.json"), JSON.stringify(settings, null, 2))
 }
 
 function createCtx(): ActionContext {
-  const config: ReeveDaemonConfig = {
+  const config: GoblinDaemonConfig = {
     source: "linear",
     linear: {
       apiKey: "",
@@ -245,7 +245,7 @@ describe("projects actions", () => {
     expect(data.teams).toEqual([{ key: "TES", name: "Test Team" }])
 
     const stored = JSON.parse(
-      readFileSync(join(homeDir, ".reeve", "settings.json"), "utf-8"),
+      readFileSync(join(homeDir, ".pr-goblin", "settings.json"), "utf-8"),
     )
     expect(stored.linearApiKey).toBe("lin_api_test")
   })
@@ -382,7 +382,7 @@ describe("projects actions", () => {
     process.env.HOME = homeDir
     writeSettings(homeDir, {})
 
-    const workspaceRoot = resolve(homeDir, ".reeve", "workspaces")
+    const workspaceRoot = resolve(homeDir, ".pr-goblin", "workspaces")
     mkdirSync(resolve(workspaceRoot, "ian", "demo", ".git"), { recursive: true })
 
     const addedRepos: string[] = []
@@ -407,7 +407,7 @@ describe("projects actions", () => {
     expect(result.ok).toBe(true)
     expect(addedRepos).toEqual(["ian/demo"])
 
-    const stored = JSON.parse(readFileSync(join(homeDir, ".reeve", "settings.json"), "utf-8"))
+    const stored = JSON.parse(readFileSync(join(homeDir, ".pr-goblin", "settings.json"), "utf-8"))
     expect(stored.projects).toEqual([
       {
         team: "TES",
@@ -424,7 +424,7 @@ describe("projects actions", () => {
     writeSettings(homeDir, {})
     // verifyRepoExistsResult defaults to null in beforeEach — repo check passes.
 
-    const workspaceRoot = resolve(homeDir, ".reeve", "workspaces")
+    const workspaceRoot = resolve(homeDir, ".pr-goblin", "workspaces")
     mkdirSync(resolve(workspaceRoot, "acme", "app", ".git"), { recursive: true })
 
     const onActivate = mock(async () => {})
@@ -448,7 +448,7 @@ describe("projects actions", () => {
     process.env.HOME = homeDir
     writeSettings(homeDir, {})
 
-    const workspaceRoot = resolve(homeDir, ".reeve", "workspaces")
+    const workspaceRoot = resolve(homeDir, ".pr-goblin", "workspaces")
     mkdirSync(resolve(workspaceRoot, "acme", "slow-app", ".git"), { recursive: true })
 
     let releaseActivation!: () => void
@@ -487,7 +487,7 @@ describe("projects actions", () => {
     process.env.HOME = homeDir
     writeSettings(homeDir, {})
 
-    const workspaceRoot = resolve(homeDir, ".reeve", "workspaces")
+    const workspaceRoot = resolve(homeDir, ".pr-goblin", "workspaces")
     mkdirSync(resolve(workspaceRoot, "acme", "broken-app", ".git"), { recursive: true })
 
     const onActivate = mock(async () => { throw new Error("boom") })
@@ -512,7 +512,7 @@ describe("projects actions", () => {
     process.env.HOME = homeDir
     writeSettings(homeDir, {})
 
-    const workspaceRoot = resolve(homeDir, ".reeve", "workspaces")
+    const workspaceRoot = resolve(homeDir, ".pr-goblin", "workspaces")
     mkdirSync(resolve(workspaceRoot, "acme", "app2", ".git"), { recursive: true })
 
     const onActivate = mock(async () => {})
@@ -554,7 +554,7 @@ describe("projects actions", () => {
     expect(result.error).toContain("acme/missing")
     expect(result.error).toContain("could not resolve to a repository")
 
-    const settingsPath = join(homeDir, ".reeve", "settings.json")
+    const settingsPath = join(homeDir, ".pr-goblin", "settings.json")
     if (existsSync(settingsPath)) {
       const stored = JSON.parse(readFileSync(settingsPath, "utf-8"))
       expect(stored.projects ?? []).toEqual([])
@@ -595,7 +595,7 @@ describe("projects actions", () => {
     expect(data.linearValid).toBe(false)
     expect(data.linearError).toBe("Could not connect to Linear. Check the key.")
 
-    const settingsPath = join(homeDir, ".reeve", "settings.json")
+    const settingsPath = join(homeDir, ".pr-goblin", "settings.json")
     const stored = JSON.parse(readFileSync(settingsPath, "utf-8"))
     expect(stored.linearApiKey).toBeUndefined()
   })

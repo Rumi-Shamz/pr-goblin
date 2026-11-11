@@ -69,7 +69,7 @@ export interface Task {
   baseBranch: string
 
   // Runtime (set after dispatch)
-  taskDir?: string           // Task root: ~/.reeve/tasks/{id}/
+  taskDir?: string           // Task root: ~/.pr-goblin/tasks/{id}/
   workDir?: string           // Implement agent CWD: {taskDir}/implement/
   worktree?: string          // Git worktree path: {taskDir}/{repo}/ — for git ops, hooks, PR detection
   branch?: string

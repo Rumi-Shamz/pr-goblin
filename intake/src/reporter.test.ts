@@ -44,7 +44,7 @@ describe('reporter (optional user identity)', () => {
     const parsed = submissionSchema.parse(widgetPayload({ user: { name: 'Ada Lovelace', login: 'ada' } }))
     const body = buildIssueBody(parsed, null)
     expect(body).toContain('| Project | Test Harness |\n\n**Reporter:** ada (Ada Lovelace)\n\n')
-    const m = body.match(/<!-- bugpilot:structured\n([\s\S]*?)\nbugpilot:end -->/)
+    const m = body.match(/<!-- pr-goblin:structured\n([\s\S]*?)\npr-goblin:end -->/)
     expect(m).not.toBeNull()
     const json = JSON.parse(m![1])
     expect(json.reporter).toEqual({ name: 'Ada Lovelace', login: 'ada' })

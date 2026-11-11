@@ -24,7 +24,7 @@ export function findPidByPort(port: number, execSync?: typeof Bun.spawnSync): Fi
   return { ok: true, pid }
 }
 
-const REEVE_ROOT = resolve(dirname(new URL(import.meta.url).pathname), '../../..')
+const GOBLIN_ROOT = resolve(dirname(new URL(import.meta.url).pathname), '../../..')
 
 // ── Kernel bootstrap ─────────────────────────────────────
 
@@ -37,7 +37,7 @@ async function printStartBanner(config: ReturnType<typeof loadConfig>): Promise<
   const repos = config.projects.map((p: { repo: string }) => p.repo).join(', ')
   let version = '0.0.0'
   try {
-    const pkg = JSON.parse(readFileSync(resolve(REEVE_ROOT, 'package.json'), 'utf-8'))
+    const pkg = JSON.parse(readFileSync(resolve(GOBLIN_ROOT, 'package.json'), 'utf-8'))
     version = pkg.version
   } catch { /* fallback to 0.0.0 */ }
   await printAnimatedBanner({
@@ -91,7 +91,7 @@ async function cmdInit(): Promise<void> {
 }
 
 export function buildAlreadyRunningMessage(pid: number): string {
-  return `reeve is already running (pid ${pid}). Run 'reeve stop' first.`
+  return `goblin is already running (pid ${pid}). Run 'goblin stop' first.`
 }
 
 async function cmdStart(): Promise<void> {
@@ -139,7 +139,7 @@ async function cmdStart(): Promise<void> {
     process.kill(child.pid, 0)
   } catch {
     removePid()
-    console.error(`reeve failed to start (pid ${child.pid} exited immediately)`)
+    console.error(`goblin failed to start (pid ${child.pid} exited immediately)`)
     console.error(`  Check log: ${logPath}`)
     const tail = trySpawnSync(['tail', '-n', '5', logPath])
     if (tail.kind === 'ok' && tail.stdout) process.stderr.write(tail.stdout)
@@ -157,10 +157,10 @@ async function cmdStart(): Promise<void> {
 export function buildRunNotReadyMessage(issues: string[]): string {
   const bullet = issues.map(i => `  • ${i}`).join("\n")
   return (
-    `✗ reeve run blocked — setup incomplete:\n` +
+    `✗ goblin run blocked — setup incomplete:\n` +
     `${bullet}\n\n` +
-    `  reeve init      Interactive wizard\n` +
-    `  reeve start     Background daemon + dashboard setup`
+    `  goblin init      Interactive wizard\n` +
+    `  goblin start     Background daemon + dashboard setup`
   )
 }
 
@@ -176,7 +176,7 @@ export function buildDaemonStartedBanner(opts: {
   return (
     `${head}\n` +
     `Log        ${opts.logPath}\n` +
-    `Stop       reeve stop  (pid ${opts.pid})`
+    `Stop       goblin stop  (pid ${opts.pid})`
   )
 }
 
@@ -303,18 +303,18 @@ async function cmdStop(): Promise<void> {
     const found = findPidByPort(port)
     if (!found.ok) {
       if (found.reason === "not-installed") {
-        console.log(`reeve is not running (or install lsof to verify port ${port})`)
+        console.log(`goblin is not running (or install lsof to verify port ${port})`)
       } else {
-        console.log('reeve is not running')
+        console.log('goblin is not running')
       }
       return
     }
     try {
       process.kill(found.pid, 'SIGTERM')
-      console.log(`reeve stopped (pid: ${found.pid}, found by port ${port})`)
+      console.log(`goblin stopped (pid: ${found.pid}, found by port ${port})`)
       removePid()
     } catch {
-      console.log('reeve is not running')
+      console.log('goblin is not running')
     }
     return
   }
@@ -322,10 +322,10 @@ async function cmdStop(): Promise<void> {
   try {
     process.kill(pid, 'SIGTERM')
     removePid()
-    console.log(`reeve stopped (pid: ${pid})`)
+    console.log(`goblin stopped (pid: ${pid})`)
   } catch {
     removePid()
-    console.log('reeve is not running (stale pid cleaned)')
+    console.log('goblin is not running (stale pid cleaned)')
   }
 }
 
@@ -354,10 +354,10 @@ export function registerLifecycleCommands(cli: CAC): void {
       await cmdRun()
     })
 
-  // Internal: spawned by `reeve start`. The "Internal:" prefix signals users
+  // Internal: spawned by `goblin start`. The "Internal:" prefix signals users
   // should not invoke it directly (cac has no hidden-command flag).
   cli
-    .command('daemon', 'Internal: background daemon (used by `reeve start`)')
+    .command('daemon', 'Internal: background daemon (used by `goblin start`)')
     .action(async () => {
       await cmdDaemon()
     })

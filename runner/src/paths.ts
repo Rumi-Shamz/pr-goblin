@@ -1,10 +1,10 @@
 import { isAbsolute, relative, resolve } from "path"
 
-export const REEVE_DIR = process.env.REEVE_DIR || resolve(process.env.HOME || "/tmp", ".reeve")
+export const GOBLIN_DIR = process.env.GOBLIN_DIR || resolve(process.env.HOME || "/tmp", ".pr-goblin")
 
-export const LOGS_DIR = resolve(REEVE_DIR, "logs")
+export const LOGS_DIR = resolve(GOBLIN_DIR, "logs")
 
-export const TASKS_DIR = resolve(REEVE_DIR, "tasks")
+export const TASKS_DIR = resolve(GOBLIN_DIR, "tasks")
 
 export function sanitizeTaskIdentifier(identifier: string): string {
   return identifier
@@ -19,12 +19,12 @@ export function isPathWithinRoot(root: string, candidate: string): boolean {
   return rel === "" || (!rel.startsWith("..") && !isAbsolute(rel))
 }
 
-/** Root directory for a task: ~/.reeve/tasks/{sanitized-id}/ */
+/** Root directory for a task: ~/.pr-goblin/tasks/{sanitized-id}/ */
 export function taskDir(identifier: string): string {
   return resolve(TASKS_DIR, sanitizeTaskIdentifier(identifier))
 }
 
-/** Log dir for an agent: ~/.reeve/tasks/{id}/{agentName}/ */
+/** Log dir for an agent: ~/.pr-goblin/tasks/{id}/{agentName}/ */
 export function taskLogDir(identifier: string, agentName = "implement"): string {
   return resolve(taskDir(identifier), agentName)
 }

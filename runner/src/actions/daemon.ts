@@ -7,7 +7,7 @@ import { existsSync, readFileSync } from "fs"
 import { join, resolve } from "path"
 import { registerAction } from "./registry"
 import type { ActionContext } from "./types"
-import { REEVE_DIR, LOGS_DIR } from "../paths"
+import { GOBLIN_DIR, LOGS_DIR } from "../paths"
 import { readLiveSessionEvents } from "../kernel/live-session"
 import { parseSessionEvents } from "../session-events"
 import { StateStore } from "../kernel/state"
@@ -16,7 +16,7 @@ import type { Task } from "../kernel/types"
 // ── State file reader (uses StateStore for schema validation) ──
 
 function readStateFile(): Task[] {
-  const path = resolve(REEVE_DIR, "state.json")
+  const path = resolve(GOBLIN_DIR, "state.json")
   if (!existsSync(path)) return []
   const store = new StateStore(path)
   store.load()

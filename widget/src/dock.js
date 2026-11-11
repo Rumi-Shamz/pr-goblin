@@ -12,7 +12,7 @@ export const HIT = 44             // px, WCAG 2.5.8 minimum target size
 // different paths still gets one shared position, and a copied value from
 // another origin is obviously foreign.
 export function storageKey(origin) {
-  return `bugpilot.tab:${origin}`
+  return `pr-goblin.tab:${origin}`
 }
 
 export function clampY(y, viewportHeight) {

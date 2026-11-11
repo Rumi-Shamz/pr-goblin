@@ -1,6 +1,6 @@
 # Threat model
 
-bugpilot moves data across four trust boundaries: an anonymous browser into a Worker, a Worker
+pr-goblin moves data across four trust boundaries: an anonymous browser into a Worker, a Worker
 into a GitHub repo, GitHub issue content into an LLM with repo-write credentials, and a Worker
 into a human's phone via a third-party push service. This is a snapshot of what crosses each one,
 what's trusted on either side, and which risks are mitigated versus accepted. It reflects the code
@@ -30,13 +30,13 @@ screenshot cap; `<`/`>` stripped from the optional reporter name/login; CORS `AL
 GitHub issues, at the cost of repo noise and GitHub API quota, not data exposure. No magic-byte
 check on the screenshot before it is committed via the Contents API, so a non-image blob up to 4MB
 can land in the `bug-report-screenshots` branch; worst case is a static raw file, not execution.
-Both are accepted because bugpilot is a small/solo-scale tool and abuse here is visible (spam
+Both are accepted because pr-goblin is a small/solo-scale tool and abuse here is visible (spam
 issues), not silent.
 
 ## 2. Worker → GitHub (issue creation, screenshot commit, label writes)
 
 **Crosses:** the Worker holds `GITHUB_TOKEN` and turns anonymous, boundary-1 content into a real
-GitHub issue plus a `<!-- bugpilot:structured -->` JSON block, which a downstream automation (the
+GitHub issue plus a `<!-- pr-goblin:structured -->` JSON block, which a downstream automation (the
 triage action) later parses as data that drives its own next actions.
 
 **Trusted:** the Worker's own code, deployed by Rodney; `GITHUB_TOKEN` never reaches the client.
@@ -78,7 +78,7 @@ sufficiently crafted issue could still steer Claude toward a subtly bad change. 
 the blast radius is the same as a bad human PR: it sits open, unmerged, until reviewed. Also
 accepted: apply-fix's `workflow_dispatch` takes a bare `issue_number` and anyone with repo write
 access can trigger it manually regardless of the ntfy path; that's GitHub's own permission model,
-not something bugpilot code controls.
+not something pr-goblin code controls.
 
 ## 4. Worker ↔ ntfy ↔ human phone (the approval channel)
 
@@ -102,5 +102,5 @@ out unauthenticated if the topic isn't access-controlled. Accepted as a lower-se
 disclosure (prose, not a credential); the README documents using a hard-to-guess topic slug or a
 self-hosted, access-controlled ntfy server for anyone who treats the triage detail as sensitive.
 `ntfy-token` authenticates the *publish* call to a self-hosted server but doesn't by itself prove
-reads are restricted; that ACL is the server operator's to configure and isn't something bugpilot's
+reads are restricted; that ACL is the server operator's to configure and isn't something pr-goblin's
 client-side code can verify.

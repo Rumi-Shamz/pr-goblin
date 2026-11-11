@@ -138,7 +138,7 @@ export default {
     }
     for (const name of ['ALLOWED_ORIGIN', 'GITHUB_REPO', 'GITHUB_TOKEN'] as const) {
       if (!env[name]) {
-        console.error(`[bugpilot] worker misconfigured: ${name} is not set`)
+        console.error(`[pr-goblin] worker misconfigured: ${name} is not set`)
         return jsonError(`Worker misconfigured: ${name} is not set`, 500, fallbackCors)
       }
     }
@@ -172,7 +172,7 @@ export default {
 
       return new Response('Not found', { status: 404, headers: corsHeaders })
     } catch (err) {
-      console.error('[bugpilot] unhandled error', err)
+      console.error('[pr-goblin] unhandled error', err)
       return jsonError('Internal error', 500, corsHeaders)
     }
   },
@@ -198,7 +198,7 @@ async function handleFeedback(
     const detail = parsed.error.issues
       .map((i) => `${i.path.join('.') || 'payload'}: ${i.message}`)
       .join('; ')
-    console.warn(`[bugpilot] /feedback validation failed (${request.headers.get('CF-Connecting-IP') ?? 'unknown ip'}): ${detail}`)
+    console.warn(`[pr-goblin] /feedback validation failed (${request.headers.get('CF-Connecting-IP') ?? 'unknown ip'}): ${detail}`)
     return jsonError(`Invalid payload: ${detail}`, 400, corsHeaders)
   }
   // Neutralise the structured-block markers in user text so a submitter
@@ -247,7 +247,7 @@ async function handleFeedback(
       Accept: 'application/vnd.github+json',
       Authorization: `Bearer ${env.GITHUB_TOKEN}`,
       'X-GitHub-Api-Version': '2022-11-28',
-      'User-Agent': 'bugpilot-worker/0.1',
+      'User-Agent': 'pr-goblin-worker/0.1',
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({ title: issueTitle, body: issueBody, labels }),
@@ -255,7 +255,7 @@ async function handleFeedback(
 
   if (!issueRes.ok) {
     const err = await issueRes.text()
-    console.error('[bugpilot] GitHub issue creation failed', issueRes.status, err)
+    console.error('[pr-goblin] GitHub issue creation failed', issueRes.status, err)
     return jsonError('Failed to create GitHub issue', 502, corsHeaders)
   }
 
@@ -282,7 +282,7 @@ async function handleApplyFix(
     // A missing, forged or expired token is the one probe on this worker
     // worth a trace: it is the sole gate on dispatching the apply-fix
     // workflow.
-    console.warn(`[bugpilot] webhook auth failure from ${request.headers.get('CF-Connecting-IP') ?? 'unknown ip'}`)
+    console.warn(`[pr-goblin] webhook auth failure from ${request.headers.get('CF-Connecting-IP') ?? 'unknown ip'}`)
     return jsonError('Unauthorized', 401, corsHeaders)
   }
 
@@ -305,7 +305,7 @@ async function handleApplyFix(
         Authorization: `Bearer ${env.GITHUB_TOKEN}`,
         Accept: 'application/vnd.github+json',
         'X-GitHub-Api-Version': '2022-11-28',
-        'User-Agent': 'bugpilot-worker/0.1',
+        'User-Agent': 'pr-goblin-worker/0.1',
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
@@ -317,7 +317,7 @@ async function handleApplyFix(
 
   if (!dispatchRes.ok) {
     const text = await dispatchRes.text()
-    console.error('[bugpilot] workflow_dispatch failed', dispatchRes.status, text)
+    console.error('[pr-goblin] workflow_dispatch failed', dispatchRes.status, text)
     return jsonError('Failed to trigger apply-fix workflow', 502, corsHeaders)
   }
 
@@ -328,7 +328,7 @@ async function handleApplyFix(
 }
 
 const LABEL_DEFAULTS: Record<string, { color: string; description: string }> = {
-  'user-feedback': { color: '0075ca', description: 'Submitted via bugpilot feedback widget' },
+  'user-feedback': { color: '0075ca', description: 'Submitted via pr-goblin feedback widget' },
   'bug':           { color: 'd73a4a', description: 'Something is not working' },
   'enhancement':   { color: 'a2eeef', description: 'New feature or request' },
 }
@@ -338,7 +338,7 @@ async function ensureLabelsExist(owner: string, repo: string, labels: string[], 
     Authorization: `Bearer ${token}`,
     Accept: 'application/vnd.github+json',
     'X-GitHub-Api-Version': '2022-11-28',
-    'User-Agent': 'bugpilot-worker/0.1',
+    'User-Agent': 'pr-goblin-worker/0.1',
     'Content-Type': 'application/json',
   }
   await Promise.all(labels.map(async (name) => {
@@ -351,10 +351,10 @@ async function ensureLabelsExist(owner: string, repo: string, labels: string[], 
         body: JSON.stringify({ name, ...defaults }),
       })
       if (!create.ok) {
-        console.error('[bugpilot] label creation failed', name, create.status, await create.text())
+        console.error('[pr-goblin] label creation failed', name, create.status, await create.text())
       }
     } else if (!check.ok) {
-      console.error('[bugpilot] label check failed', name, check.status, await check.text())
+      console.error('[pr-goblin] label check failed', name, check.status, await check.text())
     }
   }))
 }
@@ -366,7 +366,7 @@ async function uploadScreenshot(dataUrl: string, env: Env): Promise<string | nul
     const [owner, repo] = env.GITHUB_REPO.split('/')
     const match = dataUrl.match(/^data:image\/(png|jpeg|gif|webp);base64,/)
     if (!match) {
-      console.error('[bugpilot] screenshot rejected: unsupported MIME type')
+      console.error('[pr-goblin] screenshot rejected: unsupported MIME type')
       return null
     }
     const base64 = dataUrl.slice(match[0].length)
@@ -375,7 +375,7 @@ async function uploadScreenshot(dataUrl: string, env: Env): Promise<string | nul
       Authorization: `Bearer ${env.GITHUB_TOKEN}`,
       Accept: 'application/vnd.github+json',
       'X-GitHub-Api-Version': '2022-11-28',
-      'User-Agent': 'bugpilot-worker/0.1',
+      'User-Agent': 'pr-goblin-worker/0.1',
       'Content-Type': 'application/json',
     }
 
@@ -392,13 +392,13 @@ async function uploadScreenshot(dataUrl: string, env: Env): Promise<string | nul
     })
 
     if (!res.ok) {
-      console.error('[bugpilot] screenshot commit failed', res.status, await res.text())
+      console.error('[pr-goblin] screenshot commit failed', res.status, await res.text())
       return null
     }
 
     return `https://github.com/${owner}/${repo}/raw/${SCREENSHOTS_BRANCH}/${filename}`
   } catch (err) {
-    console.error('[bugpilot] screenshot upload failed', err)
+    console.error('[pr-goblin] screenshot upload failed', err)
     return null
   }
 }
@@ -519,9 +519,9 @@ ${stepsSection}## Details
 | Timestamp | ${ctx.timestamp} |
 | Project | ${body.projectName ?? '—'} |
 
-${reporterLine(body.user)}${screenshotSection}<!-- bugpilot:structured
+${reporterLine(body.user)}${screenshotSection}<!-- pr-goblin:structured
 ${structured}
-bugpilot:end -->
+pr-goblin:end -->
 `
 }
 
@@ -567,9 +567,9 @@ ${whySection}## Details
 | URL | ${ctx.url} |
 | Submitted | ${ctx.timestamp} |
 
-${reporterLine(body.user)}${screenshotSection}<!-- bugpilot:structured
+${reporterLine(body.user)}${screenshotSection}<!-- pr-goblin:structured
 ${structured}
-bugpilot:end -->
+pr-goblin:end -->
 `
 }
 
@@ -606,7 +606,7 @@ export function neutraliseMarkers(v: string | null | undefined): string | null {
   // The zero-width space (U+200B) stops '-->' in user text from closing the
   // HTML comment that carries the structured block, without visibly altering
   // the rendered issue body.
-  return v.replace(/bugpilot:(structured|end)/gi, 'bugpilot $1').replace(/-->/g, '--\u200b>')
+  return v.replace(/pr-goblin:(structured|end)/gi, 'pr-goblin $1').replace(/-->/g, '--\u200b>')
 }
 
 // RFC 9457 status-text lookup for the "title" member. Only the statuses this
@@ -626,7 +626,7 @@ const STATUS_TITLES: Record<number, string> = {
 // `error` are kept alongside `type`/`title`/`status`/`detail` for one
 // deprecation cycle: widget/src/widget.js:465 reads `body.error` directly,
 // and this avoids a coupled widget release. Drop them once the widget no
-// longer needs it (bugpilot#64).
+// longer needs it (pr-goblin#64).
 export function jsonError(message: string, status: number, corsHeaders: Record<string, string>): Response {
   return new Response(
     JSON.stringify({

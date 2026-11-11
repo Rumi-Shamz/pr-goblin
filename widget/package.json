@@ -1,14 +1,14 @@
 {
-  "name": "bugpilot-widget",
+  "name": "pr-goblin-widget",
   "version": "1.3.1",
   "description": "Drop-in feedback and bug-capture widget with AI-powered triage",
   "type": "module",
-  "main": "./dist/bugpilot.umd.js",
-  "module": "./dist/bugpilot.es.js",
+  "main": "./dist/pr-goblin.umd.js",
+  "module": "./dist/pr-goblin.es.js",
   "exports": {
     ".": {
-      "import": "./dist/bugpilot.es.js",
-      "require": "./dist/bugpilot.umd.js"
+      "import": "./dist/pr-goblin.es.js",
+      "require": "./dist/pr-goblin.umd.js"
     }
   },
   "files": [

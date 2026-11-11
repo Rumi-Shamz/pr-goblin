@@ -1,5 +1,5 @@
 #!/usr/bin/env bun
-// cli/app.ts — Reeve CLI entry point (cac-based)
+// cli/app.ts — Goblin CLI entry point (cac-based)
 
 import { cac } from 'cac'
 import picocolors from 'picocolors'
@@ -13,14 +13,13 @@ import { registerLifecycleCommands } from './commands/lifecycle'
 import { registerTaskCommands } from './commands/tasks'
 import { registerProjectCommands } from './commands/projects'
 import { registerSystemCommands } from './commands/system'
-import { registerUpdateCommand } from './commands/update'
 
 const pkgJson = JSON.parse(
   readFileSync(new URL('../../package.json', import.meta.url), 'utf-8'),
 ) as { version: string }
 
 export function createCliApp() {
-  const cli = cac('reeve')
+  const cli = cac('goblin')
 
   cli.version(pkgJson.version)
   cli.option('--json', `Output ${picocolors.bold('JSON')}`)
@@ -29,7 +28,6 @@ export function createCliApp() {
   registerTaskCommands(cli)
   registerProjectCommands(cli)
   registerSystemCommands(cli)
-  registerUpdateCommand(cli)
 
   cli.help()
 

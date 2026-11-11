@@ -1,9 +1,9 @@
 import { describe, expect, test } from "bun:test"
 
-import type { ReeveDaemonConfig } from "../config"
+import type { GoblinDaemonConfig } from "../config"
 import { prepareCodexSandbox } from "./codex-sandbox"
 
-function createConfig(apiKey?: string): ReeveDaemonConfig {
+function createConfig(apiKey?: string): GoblinDaemonConfig {
   return {
     source: "linear",
     linear: {
@@ -40,21 +40,21 @@ describe("prepareCodexSandbox", () => {
     expect(sandbox).toEqual({})
   })
 
-  test("returns `-c` flags for reeve-linear when Linear API key is present", async () => {
+  test("returns `-c` flags for goblin-linear when Linear API key is present", async () => {
     const sandbox = await prepareCodexSandbox("/tmp/worktree", createConfig("lin_api_test"))
 
     expect(sandbox).toEqual({
       extraArgs: [
         "-c",
-        'mcp_servers.reeve-linear.command="npx"',
+        'mcp_servers.goblin-linear.command="npx"',
         "-c",
-        'mcp_servers.reeve-linear.args=["-y","mcp-graphql"]',
+        'mcp_servers.goblin-linear.args=["-y","mcp-graphql"]',
         "-c",
-        'mcp_servers.reeve-linear.env.ENDPOINT="https://api.linear.app/graphql"',
+        'mcp_servers.goblin-linear.env.ENDPOINT="https://api.linear.app/graphql"',
         "-c",
-        'mcp_servers.reeve-linear.env.ALLOW_MUTATIONS="true"',
+        'mcp_servers.goblin-linear.env.ALLOW_MUTATIONS="true"',
         "-c",
-        'mcp_servers.reeve-linear.env.HEADERS="{\\"Authorization\\":\\"lin_api_test\\"}"',
+        'mcp_servers.goblin-linear.env.HEADERS="{\\"Authorization\\":\\"lin_api_test\\"}"',
       ],
     })
   })
@@ -64,7 +64,7 @@ describe("prepareCodexSandbox", () => {
     const headersArg = sandbox.extraArgs?.[9]
 
     expect(headersArg).toBe(
-      'mcp_servers.reeve-linear.env.HEADERS="{\\"Authorization\\":\\"lin_api_\\\\\\"quoted\\\\\\"\\"}"',
+      'mcp_servers.goblin-linear.env.HEADERS="{\\"Authorization\\":\\"lin_api_\\\\\\"quoted\\\\\\"\\"}"',
     )
   })
 })

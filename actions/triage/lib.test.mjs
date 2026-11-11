@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from 'vitest'
 import { parseStructuredBlock, buildComment, deriveLabels, ntfyServerAndTopic, buildUserMessage, houseStyle, applyHouseStyle, resolveAuthMode, buildAnthropicClientOptions, ANTHROPIC_OIDC_AUDIENCE, signApprovalToken, verifyApprovalToken, APPROVAL_TOKEN_TTL_SECONDS } from './lib.mjs'
 
-const block = (json) => `<!-- bugpilot:structured\n${json}\nbugpilot:end -->`
+const block = (json) => `<!-- pr-goblin:structured\n${json}\npr-goblin:end -->`
 
 describe('parseStructuredBlock', () => {
   it('parses the structured block out of an issue body', () => {
@@ -42,7 +42,7 @@ describe('buildComment', () => {
       proposed_fix: 'Guard the null',
       response_draft: 'Thanks!\nWe are on it.',
     })
-    expect(c).toContain('### bugpilot triage')
+    expect(c).toContain('### pr-goblin triage')
     expect(c).toContain('**Classification:** Bug')
     expect(c).toContain('**Severity:** medium')
     expect(c).toContain('**Proposed fix:** Guard the null')

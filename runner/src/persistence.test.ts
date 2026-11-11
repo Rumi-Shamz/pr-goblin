@@ -10,7 +10,7 @@ afterEach((): void => {
 
 describe("persistence", () => {
   test("writeJsonFileAtomic creates file with JSON content", (): void => {
-    const dir = testTmpDir("reeve-persistence-")
+    const dir = testTmpDir("goblin-persistence-")
     const path = join(dir, "test.json")
 
     writeJsonFileAtomic(path, { foo: "bar", num: 42 })
@@ -21,7 +21,7 @@ describe("persistence", () => {
   })
 
   test("writeJsonFileAtomic creates parent directories", (): void => {
-    const dir = testTmpDir("reeve-persistence-")
+    const dir = testTmpDir("goblin-persistence-")
     const path = join(dir, "nested", "deep", "test.json")
 
     writeJsonFileAtomic(path, { ok: true })

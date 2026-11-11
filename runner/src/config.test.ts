@@ -7,16 +7,16 @@ import { loadConfig } from "./config"
 
 const createdDirs: string[] = []
 let savedHome: string | undefined
-let savedReeveDir: string | undefined
+let savedGoblinDir: string | undefined
 
 function createTempHome(): string {
-  const dir = mkdtempSync(join(tmpdir(), "reeve-config-"))
+  const dir = mkdtempSync(join(tmpdir(), "goblin-config-"))
   createdDirs.push(dir)
   return dir
 }
 
 function writeSettings(homeDir: string, settings: Record<string, unknown>): void {
-  const settingsDir = resolve(homeDir, ".reeve")
+  const settingsDir = resolve(homeDir, ".pr-goblin")
   mkdirSync(settingsDir, { recursive: true })
   writeFileSync(join(settingsDir, "settings.json"), JSON.stringify(settings, null, 2))
 }
@@ -28,9 +28,9 @@ afterEach((): void => {
   if (savedHome !== undefined) process.env.HOME = savedHome
   else delete process.env.HOME
   savedHome = undefined
-  if (savedReeveDir !== undefined) process.env.REEVE_DIR = savedReeveDir
-  else delete process.env.REEVE_DIR
-  savedReeveDir = undefined
+  if (savedGoblinDir !== undefined) process.env.GOBLIN_DIR = savedGoblinDir
+  else delete process.env.GOBLIN_DIR
+  savedGoblinDir = undefined
 })
 
 describe("loadConfig", () => {
@@ -46,9 +46,9 @@ describe("loadConfig", () => {
     })
 
     savedHome = process.env.HOME
-    savedReeveDir = process.env.REEVE_DIR
+    savedGoblinDir = process.env.GOBLIN_DIR
     process.env.HOME = homeDir
-    delete process.env.REEVE_DIR
+    delete process.env.GOBLIN_DIR
 
     const config = loadConfig()
     expect(config.linear!.apiKey).toBe("lin_api_test")
@@ -62,20 +62,20 @@ describe("loadConfig", () => {
   test("uses defaults when settings.json is missing", (): void => {
     const homeDir = createTempHome()
     savedHome = process.env.HOME
-    savedReeveDir = process.env.REEVE_DIR
+    savedGoblinDir = process.env.GOBLIN_DIR
     process.env.HOME = homeDir
-    delete process.env.REEVE_DIR
+    delete process.env.GOBLIN_DIR
 
     const config = loadConfig()
     expect(config.linear!.apiKey).toBe("")
     expect(config.agent.default).toBe("claude")
     expect(config.projects).toEqual([])
-    expect(config.workspace.root).toBe(resolve(homeDir, ".reeve", "workspaces"))
+    expect(config.workspace.root).toBe(resolve(homeDir, ".pr-goblin", "workspaces"))
   })
 
-  test("ignores legacy ~/.config/reeve/settings.json", (): void => {
+  test("ignores legacy ~/.config/pr-goblin/settings.json", (): void => {
     const homeDir = createTempHome()
-    const legacyDir = resolve(homeDir, ".config", "reeve")
+    const legacyDir = resolve(homeDir, ".config", "goblin")
     mkdirSync(legacyDir, { recursive: true })
     writeFileSync(
       join(legacyDir, "settings.json"),
@@ -88,14 +88,14 @@ describe("loadConfig", () => {
     )
 
     savedHome = process.env.HOME
-    savedReeveDir = process.env.REEVE_DIR
+    savedGoblinDir = process.env.GOBLIN_DIR
     process.env.HOME = homeDir
-    delete process.env.REEVE_DIR
+    delete process.env.GOBLIN_DIR
 
     const config = loadConfig()
 
     expect(config.linear!.apiKey).toBe("")
     expect(config.projects).toEqual([])
-    expect(existsSync(resolve(homeDir, ".reeve", "settings.json"))).toBe(false)
+    expect(existsSync(resolve(homeDir, ".pr-goblin", "settings.json"))).toBe(false)
   })
 })

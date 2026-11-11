@@ -4,18 +4,18 @@ import { resolve } from "path"
 import { runPostAgents } from "./runner"
 import type { SpawnPostAgentFn } from "./runner"
 import type { Task } from "../types"
-import type { ReeveDaemonConfig } from "../../config"
+import type { GoblinDaemonConfig } from "../../config"
 import type { PostAgent } from "./types"
 import { testTmpDir, cleanupTestTmp } from "../../test-helpers"
 
-const mockConfig = {} as ReeveDaemonConfig
+const mockConfig = {} as GoblinDaemonConfig
 
 afterEach(() => {
   cleanupTestTmp()
 })
 
 function createMockTask(tmpDir: string): Task {
-  const worktree = resolve(tmpDir, "reeve-test-fixture")
+  const worktree = resolve(tmpDir, "goblin-test-fixture")
   mkdirSync(worktree, { recursive: true })
   const implementDir = resolve(tmpDir, "implement")
   mkdirSync(implementDir, { recursive: true })
@@ -105,6 +105,6 @@ describe("runPostAgents", () => {
     expect(existsSync(agentDir)).toBe(true)
     expect(readFileSync(resolve(agentDir, "CLAUDE.md"), "utf-8")).toContain("review agent")
     expect(readFileSync(resolve(agentDir, "AGENTS.md"), "utf-8")).toContain("review agent")
-    expect(lstatSync(resolve(agentDir, "reeve-test-fixture")).isSymbolicLink()).toBe(true)
+    expect(lstatSync(resolve(agentDir, "goblin-test-fixture")).isSymbolicLink()).toBe(true)
   })
 })

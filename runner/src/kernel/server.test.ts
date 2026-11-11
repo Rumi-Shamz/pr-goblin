@@ -8,7 +8,7 @@ import { resolve } from "path"
 import { createApiApp } from "./server"
 import { Kernel } from "./kernel"
 import type { Source } from "./source"
-import type { ReeveDaemonConfig, ProjectConfig } from "../config"
+import type { GoblinDaemonConfig, ProjectConfig } from "../config"
 import type { KernelConfig, Task } from "./types"
 import type { ActionContext } from "../actions/types"
 
@@ -80,7 +80,7 @@ const WORKTREE_TASK: Task = {
 
 beforeAll(() => {
   // Isolate state/logs into temp dir
-  process.env.REEVE_DIR = TEST_DIR
+  process.env.GOBLIN_DIR = TEST_DIR
   mkdirSync(TEST_DIR, { recursive: true })
 
   writeSettings([{
@@ -93,7 +93,7 @@ beforeAll(() => {
     post: TEST_PROJECT.post,
   }])
 
-  const config: ReeveDaemonConfig = {
+  const config: GoblinDaemonConfig = {
     source: "linear",
     workspace: { root: resolve(TEST_DIR, "workspaces") },
     agent: { maxRounds: 1, stallTimeoutMs: 300000, turnTimeoutMs: 3600000, maxRetries: 2, default: "claude" },
@@ -151,7 +151,7 @@ beforeAll(() => {
 afterAll(() => {
   server?.stop()
   try { rmSync(TEST_DIR, { recursive: true, force: true }) } catch {}
-  delete process.env.REEVE_DIR
+  delete process.env.GOBLIN_DIR
 })
 
 // ── Helpers ──────────────────────────────────────────────────

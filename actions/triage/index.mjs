@@ -4,7 +4,7 @@ import Anthropic from '@anthropic-ai/sdk'
 import { parseStructuredBlock, buildUserMessage, buildComment, deriveLabels, ntfyServerAndTopic, applyHouseStyle, buildAnthropicClientOptions, signApprovalToken } from './lib.mjs'
 
 const SYSTEM_PROMPT = `You are a senior engineer triaging user-submitted bug reports and feature requests.
-You will be given a structured report from bugpilot. Analyse it carefully and call the triage_report tool with your assessment.
+You will be given a structured report from pr-goblin. Analyse it carefully and call the triage_report tool with your assessment.
 
 For bugs:
 - Is it reproducible given the information provided?
@@ -124,7 +124,7 @@ async function run() {
   const ntfyTopic = core.getInput('ntfy-topic')
   const ntfyToken = core.getInput('ntfy-token')
   const webhookSecret = core.getInput('webhook-secret')
-  const workerBase = core.getInput('bugpilot-worker-url') || process.env.BUGPILOT_WORKER_URL
+  const workerBase = core.getInput('pr-goblin-worker-url') || process.env.PR_GOBLIN_WORKER_URL
   if (ntfyTopic) {
     await sendNtfy({ ntfyTopic, ntfyToken, webhookSecret, workerBase, issue, issueUrl, triage, owner, repo })
   }

@@ -15,7 +15,7 @@ afterEach(() => {
 })
 
 function createDistFixture(): string {
-  const dir = mkdtempSync(resolve(tmpdir(), "reeve-spa-"))
+  const dir = mkdtempSync(resolve(tmpdir(), "goblin-spa-"))
   tempDirs.push(dir)
 
   mkdirSync(resolve(dir, "assets"), { recursive: true })

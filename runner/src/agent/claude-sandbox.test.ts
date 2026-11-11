@@ -2,11 +2,11 @@ import { afterAll, describe, expect, test } from "bun:test"
 import { existsSync, readFileSync } from "fs"
 import { resolve } from "path"
 
-import type { ReeveDaemonConfig } from "../config"
+import type { GoblinDaemonConfig } from "../config"
 import { cleanupTestTmp, testTmpDir } from "../test-helpers"
 import { prepareClaudeSandbox } from "./claude-sandbox"
 
-function createConfig(apiKey?: string): ReeveDaemonConfig {
+function createConfig(apiKey?: string): GoblinDaemonConfig {
   return {
     source: "linear",
     linear: {
@@ -64,7 +64,7 @@ describe("prepareClaudeSandbox", () => {
 
     expect(content).toEqual({
       mcpServers: {
-        "reeve-linear": {
+        "goblin-linear": {
           command: "npx",
           args: ["-y", "mcp-graphql"],
           env: {

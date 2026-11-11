@@ -14,7 +14,7 @@ import {
 } from 'fs';
 import { resolve } from 'path';
 
-import type { ReeveDaemonConfig } from '../config';
+import type { GoblinDaemonConfig } from '../config';
 import { writeJsonFileAtomic } from '../persistence';
 
 import type { AgentBackend } from './backend';
@@ -91,7 +91,7 @@ export async function spawnAgent(
   task: AgentTask,
   workDir: string,
   prompt: string,
-  config: ReeveDaemonConfig,
+  config: GoblinDaemonConfig,
   onEvent: AgentEventHandler,
   attempt = 1,
   agent: string,

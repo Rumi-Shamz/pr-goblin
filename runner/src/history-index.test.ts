@@ -5,7 +5,7 @@ import { testTmpDir, cleanupTestTmp } from "./test-helpers"
 import { ensureHistoryIndex, readHistoryIndex, rebuildHistoryIndex, syncHistoryIndexForTask } from "./history-index"
 
 function makeLogsDir(): { logsDir: string; indexPath: string } {
-  const root = testTmpDir("reeve-history-index-")
+  const root = testTmpDir("goblin-history-index-")
 
   const logsDir = join(root, "logs")
   const indexPath = join(logsDir, "index.json")

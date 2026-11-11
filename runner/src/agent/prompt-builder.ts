@@ -122,7 +122,7 @@ export function buildReviewOutputContract(identifier: string, prUrl?: string): s
 Post your review as a PR comment:
 
 \`\`\`bash
-cat > /tmp/reeve-review-${identifier}.md << 'REVIEW_EOF'
+cat > /tmp/goblin-review-${identifier}.md << 'REVIEW_EOF'
 ## Review — ${identifier}
 
 ### Summary
@@ -147,7 +147,7 @@ cat > /tmp/reeve-review-${identifier}.md << 'REVIEW_EOF'
 
 **Verdict**: ✅ PASS / ❌ FAIL
 REVIEW_EOF
-gh pr comment "${prUrl}" --body-file /tmp/reeve-review-${identifier}.md
+gh pr comment "${prUrl}" --body-file /tmp/goblin-review-${identifier}.md
 \`\`\``
     : ""
 
@@ -163,7 +163,7 @@ echo "FAIL" > verdict.txt   # if critical/high-severity issues found
 echo "PASS" > verdict.txt   # if all findings are acceptable
 \`\`\`
 
-You MUST write this file before finishing. The Reeve daemon reads it to determine whether to retry.`
+You MUST write this file before finishing. The Goblin daemon reads it to determine whether to retry.`
 }
 
 // ── Retry context ──────────────────────────────────────────

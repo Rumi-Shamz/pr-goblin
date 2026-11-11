@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test"
 
 import { createCliApp } from "./app"
 
-const baseArgv = ["bun", "/usr/local/lib/reeve"]
+const baseArgv = ["bun", "/usr/local/lib/goblin"]
 
 describe("cli parser regression", () => {
   test("project add command with team, review agent, and json", () => {

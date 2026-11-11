@@ -22,7 +22,7 @@ const createdDirs: string[] = []
  * Create a temp directory inside the project's .test-tmp/ folder.
  * Works in Codex sandbox, CI, and local development.
  *
- * @param prefix - Directory name prefix (e.g., "reeve-publisher-")
+ * @param prefix - Directory name prefix (e.g., "goblin-publisher-")
  * @returns Absolute path to the created temp directory
  */
 export function testTmpDir(prefix: string): string {

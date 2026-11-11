@@ -4,7 +4,7 @@ import { registerTaskCommands } from "./tasks"
 
 describe("registerTaskCommands", () => {
   it("registers exactly the expected task subcommands", () => {
-    const cli = cac("reeve")
+    const cli = cac("goblin")
     registerTaskCommands(cli)
 
     // c.name strips angle/square args; c.rawName preserves the full signature (e.g. "task show <identifier>")
@@ -19,7 +19,7 @@ describe("registerTaskCommands", () => {
   })
 
   it("does not register legacy top-level task aliases", () => {
-    const cli = cac("reeve")
+    const cli = cac("goblin")
     registerTaskCommands(cli)
 
     const rawNames = cli.commands.map((c) => c.rawName)

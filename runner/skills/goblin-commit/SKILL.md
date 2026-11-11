@@ -1,5 +1,5 @@
 ---
-name: reeve-commit
+name: goblin-commit
 description: |
   Create incremental, well-formed git commits during autonomous task execution.
   Use after completing a logical unit of work — don't batch everything into one commit.

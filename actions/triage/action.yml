@@ -1,5 +1,5 @@
-name: 'bugpilot triage'
-description: 'Claude-powered triage for bugpilot issues — classifies, assesses severity, and drafts a proposed fix'
+name: 'pr-goblin triage'
+description: 'Claude-powered triage for pr-goblin issues — classifies, assesses severity, and drafts a proposed fix'
 inputs:
   anthropic-api-key:
     description: 'Anthropic API key. Fallback when the workload identity federation inputs below are not set.'
@@ -31,8 +31,8 @@ inputs:
   webhook-secret:
     description: 'Shared secret for the apply-fix Worker webhook endpoint. Same value as the Worker WEBHOOK_SECRET env var. Never sent over ntfy itself: it signs a short-lived, issue-scoped approval token instead, so it stays illegible to anyone who can merely read the ntfy topic.'
     required: false
-  bugpilot-worker-url:
-    description: 'Base URL of the deployed bugpilot Worker (e.g. https://bugpilot-worker.your-account.workers.dev). Required for the 🟢 Approve button to trigger apply-fix.'
+  pr-goblin-worker-url:
+    description: 'Base URL of the deployed pr-goblin Worker (e.g. https://pr-goblin-worker.your-account.workers.dev). Required for the 🟢 Approve button to trigger apply-fix.'
     required: false
 runs:
   using: 'node20'

@@ -1,18 +1,18 @@
-// workspace/context-injector.ts — Inject Reeve runtime context into wrapper directories.
+// workspace/context-injector.ts — Inject Goblin runtime context into wrapper directories.
 //
 // Writes CLAUDE.md/AGENTS.md with agent identity and critical rules,
 // and symlinks bundled skills into the wrapper's agent skill directories.
 // This leverages Claude's hierarchical CLAUDE.md discovery: the wrapper-level
-// file provides persistent Reeve identity, while the user's project-level
+// file provides persistent Goblin identity, while the user's project-level
 // CLAUDE.md (inside the repo subdirectory) naturally layers on top.
 
 import { existsSync, mkdirSync, readdirSync, symlinkSync, readlinkSync, unlinkSync, writeFileSync } from "fs"
 import { resolve, dirname } from "path"
 
-/** Reeve package root (two levels up from src/workspace/) */
+/** Goblin package root (two levels up from src/workspace/) */
 const PACKAGE_ROOT = resolve(dirname(new URL(import.meta.url).pathname), "../..")
 
-/** Bundled skills directory within the Reeve package */
+/** Bundled skills directory within the Goblin package */
 const BUNDLED_SKILLS_DIR = resolve(PACKAGE_ROOT, "skills")
 
 // ── Agent rules sections ───────────────────────────────────
@@ -20,9 +20,9 @@ const BUNDLED_SKILLS_DIR = resolve(PACKAGE_ROOT, "skills")
 // buildAgentRules() assembles them into the final CLAUDE.md/AGENTS.md.
 
 const SECTION_IDENTITY = (repoName: string): string =>
-`# Reeve Agent
+`# Goblin Agent
 
-You are an autonomous coding agent managed by the Reeve daemon.
+You are an autonomous coding agent managed by the Goblin daemon.
 Project code is in the \`${repoName}/\` subdirectory. Always work from there.`
 
 const SECTION_POSTURE =
@@ -38,7 +38,7 @@ const SECTION_POSTURE =
 const SECTION_ROUTING =
 `## Step 0: Determine Current State and Route
 
-1. Read the issue current state using the \`reeve-linear\` skill.
+1. Read the issue current state using the \`goblin-linear\` skill.
 2. Route to matching flow:
    - **Todo** → move to In Progress. Check if an open PR exists for this branch (\`gh pr view --json comments --jq '.comments[].body'\`). If any comment starts with \`🔍 Review\` and contains \`❌ FAIL\`, read the findings — you are being re-dispatched to address review feedback. Then proceed to Step 1.
    - **In Progress** → continue from existing workpad. Check for PR review comments as above.
@@ -49,7 +49,7 @@ const SECTION_ROUTING =
 const SECTION_STATUS =
 `## Status Management
 
-Refer to the \`reeve-linear\` skill for GraphQL query templates.
+Refer to the \`goblin-linear\` skill for GraphQL query templates.
 
 1. **On start:** If issue is Todo, immediately move to In Progress.
 2. **During work:** Keep issue in In Progress. Update workpad frequently.
@@ -71,7 +71,7 @@ const SECTION_EXECUTION =
 ### Step 2: Implement
 
 1. Establish a baseline — reproduce the issue or confirm current behavior.
-2. Implement changes. Commit using the \`reeve-commit\` skill.
+2. Implement changes. Commit using the \`goblin-commit\` skill.
 3. Only stage files you actually created or modified — never \`git add -A\` or \`git add .\`.
 4. Run validation after each meaningful change.
 5. Stay in scope — only modify files directly related to the task.
@@ -87,21 +87,21 @@ const SECTION_EXECUTION =
 
 ### Step 4: Push & Create PR
 
-Follow the \`reeve-push\` skill. After the PR is created, move the issue to In Review using \`reeve-linear\`.`
+Follow the \`goblin-push\` skill. After the PR is created, move the issue to In Review using \`goblin-linear\`.`
 
 const SECTION_WORKPAD =
 `## Workpad — Progress Tracking
 
-Maintain a **single persistent comment** on the Linear issue as your progress log. Use \`reeve-linear\` to create and update.
+Maintain a **single persistent comment** on the Linear issue as your progress log. Use \`goblin-linear\` to create and update.
 
-1. Search existing comments for a \`## Reeve Workpad\` header (ignore resolved comments).
+1. Search existing comments for a \`## Goblin Workpad\` header (ignore resolved comments).
 2. If found, reuse. If not, create one. Persist the comment ID for future updates.
 3. Update immediately after each meaningful milestone.
 
 Template:
 
 \`\`\`markdown
-## Reeve Workpad
+## Goblin Workpad
 
 @<short-sha>
 
@@ -162,10 +162,10 @@ const SECTION_SKILLS =
 
 | Skill | Purpose |
 |-------|---------|
-| \`reeve-commit\` | Consistent, well-formed git commits |
-| \`reeve-push\` | Push branch + create/update PR |
-| \`reeve-pull\` | Sync with origin/main, resolve conflicts |
-| \`reeve-linear\` | Linear GraphQL queries, state management, comments |`
+| \`goblin-commit\` | Consistent, well-formed git commits |
+| \`goblin-push\` | Push branch + create/update PR |
+| \`goblin-pull\` | Sync with origin/main, resolve conflicts |
+| \`goblin-linear\` | Linear GraphQL queries, state management, comments |`
 
 // ── Assembly ───────────────────────────────────────────────
 
@@ -185,7 +185,7 @@ export function buildAgentRules(repoName: string): string {
 }
 
 /**
- * Provision Reeve skills into a wrapper directory's agent skill paths.
+ * Provision Goblin skills into a wrapper directory's agent skill paths.
  * Uses symlinks to the bundled skills directory (no duplication).
  *
  * Creates symlinks in two discovery paths:
@@ -207,7 +207,7 @@ export function provisionSkillsToWrapper(wrapperDir: string, filter?: string[]):
   }
 
   const bundledSkills = readdirSync(BUNDLED_SKILLS_DIR)
-    .filter(name => name.startsWith("reeve-"))
+    .filter(name => name.startsWith("goblin-"))
     .filter(name => !filter || filter.includes(name))
 
   const provisioned: string[] = []

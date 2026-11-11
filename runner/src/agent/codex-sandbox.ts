@@ -1,11 +1,11 @@
-import type { ReeveDaemonConfig } from "../config"
+import type { GoblinDaemonConfig } from "../config"
 import type { SandboxHandle } from "./backend"
 
 const LINEAR_ENDPOINT = "https://api.linear.app/graphql"
 
 export async function prepareCodexSandbox(
   _workDir: string,
-  config: ReeveDaemonConfig,
+  config: GoblinDaemonConfig,
 ): Promise<SandboxHandle> {
   const apiKey = config.linear?.apiKey
   if (!apiKey) return {}
@@ -13,15 +13,15 @@ export async function prepareCodexSandbox(
   return {
     extraArgs: [
       "-c",
-      'mcp_servers.reeve-linear.command="npx"',
+      'mcp_servers.goblin-linear.command="npx"',
       "-c",
-      'mcp_servers.reeve-linear.args=["-y","mcp-graphql"]',
+      'mcp_servers.goblin-linear.args=["-y","mcp-graphql"]',
       "-c",
-      `mcp_servers.reeve-linear.env.ENDPOINT=${JSON.stringify(LINEAR_ENDPOINT)}`,
+      `mcp_servers.goblin-linear.env.ENDPOINT=${JSON.stringify(LINEAR_ENDPOINT)}`,
       "-c",
-      'mcp_servers.reeve-linear.env.ALLOW_MUTATIONS="true"',
+      'mcp_servers.goblin-linear.env.ALLOW_MUTATIONS="true"',
       "-c",
-      `mcp_servers.reeve-linear.env.HEADERS=${JSON.stringify(
+      `mcp_servers.goblin-linear.env.HEADERS=${JSON.stringify(
         JSON.stringify({ Authorization: apiKey }),
       )}`,
     ],

@@ -31,7 +31,7 @@ export function detectDefaultBranch(
 
 export function registerProjectCommands(cli: CAC): void {
   cli
-    .command('project add <repo>', 'Add a GitHub repo to Reeve')
+    .command('project add <repo>', 'Add a GitHub repo to Goblin')
     .option('--team <team>', 'Team slug to assign')
     .option('--slug <slug>', 'Project slug to generate')
     .option('--agent <agent>', 'Default agent to use')
@@ -51,7 +51,7 @@ export function registerProjectCommands(cli: CAC): void {
       const team = opts.team || detected.inferredTeam
       if (!team) {
         console.error('\u274c Could not infer team. Use --team KEY')
-        console.error('   Run reeve init first to configure your default team.')
+        console.error('   Run goblin init first to configure your default team.')
         process.exit(1)
       }
       const projectName = detected.repoName || repo.split('/').pop() || repo
@@ -90,8 +90,8 @@ export function registerProjectCommands(cli: CAC): void {
         post: opts.review ? { review: opts.review } : undefined,
       }, { json: opts.json }, () => {
         console.log(`\n\u2705 Added ${repo}\n`)
-        console.log(`  Next: reeve start      Launch the daemon (background)`)
-        console.log(`        reeve status     Check it's running`)
+        console.log(`  Next: goblin start      Launch the daemon (background)`)
+        console.log(`        goblin status     Check it's running`)
       })
     })
 

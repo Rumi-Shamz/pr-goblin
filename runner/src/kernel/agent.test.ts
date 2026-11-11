@@ -2,10 +2,10 @@ import { afterEach, describe, expect, mock, test } from "bun:test"
 import { mkdirSync, readFileSync } from "fs"
 import { join, resolve } from "path"
 
-import type { ReeveDaemonConfig } from "../config"
+import type { GoblinDaemonConfig } from "../config"
 import { cleanupTestTmp, testTmpDir } from "../test-helpers"
 
-function createConfig(): ReeveDaemonConfig {
+function createConfig(): GoblinDaemonConfig {
   return {
     source: "linear",
     linear: {
@@ -45,7 +45,7 @@ describe("spawnForPostAgent", () => {
   test("persists review token usage into meta.json", async () => {
     const homeDir = testTmpDir("kernel-post-agent-")
     process.env.HOME = homeDir
-    mkdirSync(resolve(homeDir, ".reeve"), { recursive: true })
+    mkdirSync(resolve(homeDir, ".pr-goblin"), { recursive: true })
 
     mock.module("../agent/runner", () => ({
       spawnAgent: mock(async (_task, workDir, _prompt, _config, onEvent) => {
@@ -59,7 +59,7 @@ describe("spawnForPostAgent", () => {
               title: "Review TES-1",
               agent: "codex",
               attempt: 1,
-              repo: "acme/reeve",
+              repo: "acme/goblin",
               worktree: workDir,
               startedAt: "2026-04-19T00:00:00.000Z",
               integrity: "complete",
@@ -105,7 +105,7 @@ describe("spawnForPostAgent", () => {
         labels: [],
         priority: null,
         state: "published",
-        repo: "acme/reeve",
+        repo: "acme/goblin",
       } as never,
       workDir,
       "prompt",

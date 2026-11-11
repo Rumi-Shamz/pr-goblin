@@ -4,12 +4,12 @@ import type { PostAgent, PostAgentContext } from "./types"
 export const reviewPostAgent: PostAgent = {
   name: "review",
 
-  skills: ["reeve-linear"],
+  skills: ["goblin-linear"],
 
   buildRules(repoName: string): string {
-    return `# Reeve Review Agent
+    return `# Goblin Review Agent
 
-You are a code reviewer managed by the Reeve daemon.
+You are a code reviewer managed by the Goblin daemon.
 Project code is in the \`${repoName}/\` subdirectory.
 
 ## Rules

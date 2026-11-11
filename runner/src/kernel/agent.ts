@@ -9,7 +9,7 @@ import {
 } from '../agent/runner';
 import { buildPrompt, buildRetrySection } from '../agent/prompt-builder';
 import type { Task, AgentResult } from './types';
-import type { ReeveDaemonConfig } from '../config';
+import type { GoblinDaemonConfig } from '../config';
 import { existsSync, readFileSync } from 'fs';
 import { resolve } from 'path';
 import { writeJsonFileAtomic } from '../persistence';
@@ -59,7 +59,7 @@ function persistPostAgentUsage(workDir: string, usage: ACPEvent['usage'] | undef
 export async function spawn(
   task: Task,
   workDir: string,
-  config: ReeveDaemonConfig,
+  config: GoblinDaemonConfig,
   onEvent?: (event: ACPEvent) => void,
   agent?: string,
   attempt = 1,
@@ -106,7 +106,7 @@ export async function spawnForPostAgent(
   task: Task,
   workDir: string,
   prompt: string,
-  config: ReeveDaemonConfig,
+  config: GoblinDaemonConfig,
   agentOverride?: string,
 ): Promise<AgentResult> {
   const agentTask = toAgentTask(task);

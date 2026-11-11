@@ -4,7 +4,7 @@ import { detectDefaultBranch, registerProjectCommands } from "./projects"
 
 describe("registerProjectCommands", () => {
   it("registers exactly the expected project subcommands", () => {
-    const cli = cac("reeve")
+    const cli = cac("goblin")
     registerProjectCommands(cli)
 
     // c.name strips angle/square args; c.rawName preserves the full signature (e.g. "project add <repo>")
@@ -15,7 +15,7 @@ describe("registerProjectCommands", () => {
   })
 
   it("does not register legacy top-level project aliases", () => {
-    const cli = cac("reeve")
+    const cli = cac("goblin")
     registerProjectCommands(cli)
 
     const rawNames = cli.commands.map((c) => c.rawName)

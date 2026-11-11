@@ -16,7 +16,7 @@ const BUG_CATEGORIES = [
   'Other',
 ]
 
-export class BugPilotWidget {
+export class PrGoblinWidget {
   constructor(config) {
     this._cfg = {
       position: 'bottom-right',
@@ -397,7 +397,7 @@ export class BugPilotWidget {
         this._captureBtn.textContent = 'Retake screenshot'
       } catch (err) {
         this._captureBtn.textContent = 'Capture failed — retry'
-        console.error('[bugpilot] screenshot capture failed', err)
+        console.error('[pr-goblin] screenshot capture failed', err)
       } finally {
         this._captureBtn.disabled = false
       }
@@ -475,7 +475,7 @@ export class BugPilotWidget {
       this._autoCloseTimer = setTimeout(() => this.close(), 3000)
     } catch (err) {
       this._showError(`Failed to submit: ${err.message}`)
-      console.error('[bugpilot] submit failed', err)
+      console.error('[pr-goblin] submit failed', err)
     } finally {
       this._submitting = false
       this._submitBtn.textContent = 'Submit report'

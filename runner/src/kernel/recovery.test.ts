@@ -3,7 +3,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'fs';
 import { tmpdir } from 'os';
 import { join } from 'path';
 
-import type { ReeveDaemonConfig } from '../config';
+import type { GoblinDaemonConfig } from '../config';
 import type { Source, SourceDisposition } from './source';
 import { StateStore } from './state';
 import type { KernelConfig, Task } from './types';
@@ -19,7 +19,7 @@ const KERNEL_CONFIG: KernelConfig = {
   dashboardEnabled: false,
 };
 
-function createConfig(workspaceRoot: string): ReeveDaemonConfig {
+function createConfig(workspaceRoot: string): GoblinDaemonConfig {
   return {
     source: 'linear',
     linear: {
@@ -80,24 +80,24 @@ function makeTask(overrides: Partial<Task>): Task {
 }
 
 describe('Kernel recovery', () => {
-  let reeveDir: string;
+  let goblinDir: string;
 
   beforeEach(() => {
-    reeveDir = mkdtempSync(join(tmpdir(), 'reeve-recovery-'));
-    process.env.REEVE_DIR = reeveDir;
-    process.env.REEVE_NO_UPDATE_CHECK = '1';
-    mkdirSync(join(reeveDir, 'logs'), { recursive: true });
+    goblinDir = mkdtempSync(join(tmpdir(), 'goblin-recovery-'));
+    process.env.GOBLIN_DIR = goblinDir;
+    process.env.GOBLIN_NO_UPDATE_CHECK = '1';
+    mkdirSync(join(goblinDir, 'logs'), { recursive: true });
   });
 
   afterEach(() => {
-    rmSync(reeveDir, { recursive: true, force: true });
-    delete process.env.REEVE_DIR;
-    delete process.env.REEVE_NO_UPDATE_CHECK;
+    rmSync(goblinDir, { recursive: true, force: true });
+    delete process.env.GOBLIN_DIR;
+    delete process.env.GOBLIN_NO_UPDATE_CHECK;
   });
 
   test('start recovers mixed state and ignores delayed exit for already-done task', async () => {
     const staleTs = new Date(Date.now() - 60 * 60 * 1000).toISOString();
-    const statePath = join(reeveDir, 'state.json');
+    const statePath = join(goblinDir, 'state.json');
     const tasks: Task[] = [
       makeTask({
         id: 'done-1',
@@ -129,7 +129,7 @@ describe('Kernel recovery', () => {
         'published-1': 'passive',
         'active-1': 'actionable',
       }),
-      createConfig(join(reeveDir, 'workspace')),
+      createConfig(join(goblinDir, 'workspace')),
       KERNEL_CONFIG,
     );
     (kernel as any).store = new StateStore(statePath);

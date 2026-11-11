@@ -26,7 +26,7 @@ function getLinearApiKey(ctx: ActionContext): string {
 
 registerAction({
   name: "setupCheck",
-  description: "Lightweight check: is Reeve configured? (fast, no network calls)",
+  description: "Lightweight check: is Goblin configured? (fast, no network calls)",
   input: z.object({}),
   output: z.any(),
   requiresDaemon: false,
@@ -248,7 +248,7 @@ registerAction({
   },
 })
 
-// ── projectImport — import a project into Reeve ───────────────
+// ── projectImport — import a project into Goblin ───────────────
 
 registerAction({
   name: "projectImport",

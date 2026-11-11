@@ -4,7 +4,7 @@
 // emits normalized ACPEvents to the caller. The router in runner.ts picks a
 // backend based on the resolved agent name.
 
-import type { ReeveDaemonConfig } from '../config';
+import type { GoblinDaemonConfig } from '../config';
 import type {
   AgentEventHandler,
   AgentTask,
@@ -38,14 +38,14 @@ export interface AgentBackend {
 
   prepareSandbox?(
     workDir: string,
-    config: ReeveDaemonConfig,
+    config: GoblinDaemonConfig,
   ): Promise<SandboxHandle>;
 
   spawn(
     task: AgentTask,
     workDir: string,
     prompt: string,
-    config: ReeveDaemonConfig,
+    config: GoblinDaemonConfig,
     onEvent: AgentEventHandler,
     options: SpawnOptions,
   ): Promise<SpawnResult>;

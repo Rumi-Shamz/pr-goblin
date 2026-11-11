@@ -53,11 +53,11 @@ function createSpawnSyncStub(): typeof Bun.spawnSync {
 async function runInit(
   options: RunInitOptions = {},
 ): Promise<RunInitResult> {
-  const reeveDir = testTmpDir("init-reeve-")
-  mkdirSync(reeveDir, { recursive: true })
+  const goblinDir = testTmpDir("init-goblin-")
+  mkdirSync(goblinDir, { recursive: true })
   if (options.existingSettings !== null) {
     writeFileSync(
-      join(reeveDir, "settings.json"),
+      join(goblinDir, "settings.json"),
       JSON.stringify({
         linearApiKey: "lin_api_test",
         defaultAgent: "codex",
@@ -120,12 +120,12 @@ async function runInit(
     states: statesResponse,
   }
   const originalFetch = globalThis.fetch
-  const originalReeveDir = process.env.REEVE_DIR
+  const originalGoblinDir = process.env.GOBLIN_DIR
   const originalSpawnSync = Bun.spawnSync
   const originalExit = process.exit
 
-  // Set REEVE_DIR so loadSettings() reads from our temp dir
-  process.env.REEVE_DIR = reeveDir
+  // Set GOBLIN_DIR so loadSettings() reads from our temp dir
+  process.env.GOBLIN_DIR = goblinDir
   Bun.spawnSync = createSpawnSyncStub()
   process.exit = ((code?: number): never => {
     exitCode = code
@@ -175,8 +175,8 @@ async function runInit(
     globalThis.fetch = originalFetch
     Bun.spawnSync = originalSpawnSync
     process.exit = originalExit
-    if (originalReeveDir) process.env.REEVE_DIR = originalReeveDir
-    else delete process.env.REEVE_DIR
+    if (originalGoblinDir) process.env.GOBLIN_DIR = originalGoblinDir
+    else delete process.env.GOBLIN_DIR
   }
 }
 

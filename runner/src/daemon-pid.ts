@@ -5,7 +5,7 @@ import { resolve } from 'path'
 import { getSettingsPath } from './config'
 
 export function getPidPath(): string {
-  return resolve(getSettingsPath(), '..', 'reeve.pid')
+  return resolve(getSettingsPath(), '..', 'goblin.pid')
 }
 
 export function readPid(): number | null {

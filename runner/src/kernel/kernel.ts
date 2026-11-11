@@ -23,11 +23,11 @@ import {
 } from './agent';
 import type { ACPEvent } from '../agent/runner';
 import type { Source } from './source';
-import type { ReeveDaemonConfig, ProjectConfig } from '../config';
+import type { GoblinDaemonConfig, ProjectConfig } from '../config';
 import { resolve } from 'path';
 import { existsSync, readFileSync, appendFileSync } from 'fs';
 import {
-  REEVE_DIR,
+  GOBLIN_DIR,
   LOGS_DIR,
   sanitizeTaskIdentifier,
 } from '../paths';
@@ -106,7 +106,7 @@ export class Kernel {
   private log: SessionLogger;
   private workspace: WorkspaceManager;
   private repoStore: RepoStore;
-  private config: ReeveDaemonConfig;
+  private config: GoblinDaemonConfig;
   private running = false;
   private timer: ReturnType<typeof setTimeout> | null = null;
   private updateCheckTimer: ReturnType<typeof setInterval> | null = null;
@@ -120,16 +120,16 @@ export class Kernel {
   readonly source: Source;
 
   /** Expose config for the /api/config endpoint (strips sensitive fields at the handler). */
-  getConfig(): ReeveDaemonConfig { return this.config; }
+  getConfig(): GoblinDaemonConfig { return this.config; }
 
   constructor(
     source: Source,
-    config: ReeveDaemonConfig,
+    config: GoblinDaemonConfig,
     private kernelConfig: KernelConfig,
   ) {
     this.source = source;
     this.config = config;
-    this.store = new StateStore(resolve(REEVE_DIR, 'state.json'));
+    this.store = new StateStore(resolve(GOBLIN_DIR, 'state.json'));
     this.log = new SessionLogger(resolve(LOGS_DIR, 'session.jsonl'));
     this.workspace = new WorkspaceManager();
     this.repoStore = new RepoStore(config.workspace.root);

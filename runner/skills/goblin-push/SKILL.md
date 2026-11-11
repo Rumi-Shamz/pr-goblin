@@ -1,5 +1,5 @@
 ---
-name: reeve-push
+name: goblin-push
 description: |
   Push the current branch and create or update a pull request.
   Use when implementation is complete and validated.
@@ -11,7 +11,7 @@ description: |
 
 1. Run project validation (check `AGENTS.md` for commands, e.g. `npx tsc --noEmit`, `bun test`).
 2. Confirm all intended changes are committed (`git status` shows clean tree).
-3. If uncommitted work remains, use the `reeve-commit` skill first.
+3. If uncommitted work remains, use the `goblin-commit` skill first.
 
 ## Push
 
@@ -19,7 +19,7 @@ description: |
 git push -u origin HEAD
 ```
 
-If rejected (non-fast-forward), use the `reeve-pull` skill to sync with main, then retry.
+If rejected (non-fast-forward), use the `goblin-pull` skill to sync with main, then retry.
 Only use `--force-with-lease` if you intentionally rewrote history (e.g. after rework).
 
 ## Pull Request
@@ -43,7 +43,7 @@ Fixes ISSUE-ID
 - **Status:** success | partial
 
 ---
-*Automated by [Reeve](https://github.com/ianchenx/reeve)*
+*Automated by [Goblin](https://github.com/ianchenx/reeve)*
 EOF
 
 gh pr create --title "ISSUE-ID: <concise title>" --body-file /tmp/pr-body.md

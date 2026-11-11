@@ -1,12 +1,12 @@
 // commands/init.ts — Global setup wizard
 // Sets up Linear API key, detects agent, ensures workflow states.
-// Project onboarding is handled by `reeve project add`.
+// Project onboarding is handled by `goblin project add`.
 
 import * as p from "@clack/prompts"
 import { mkdirSync, writeFileSync } from "fs"
 import { dirname } from "path"
 
-import { getSettingsPath, loadSettings, type ReeveSettings } from "../config"
+import { getSettingsPath, loadSettings, type GoblinSettings } from "../config"
 import { ensureWorkflowStates, linearGQL, type TeamFixture } from "../project-setup"
 import { classifyLinearError } from "../utils/linear-errors"
 import { trySpawnSync } from "../utils/spawn"
@@ -17,13 +17,13 @@ function reportLinearError(err: unknown): void {
   p.log.info(info.hint)
 }
 
-function saveSettings(settings: ReeveSettings): void {
+function saveSettings(settings: GoblinSettings): void {
   const settingsPath = getSettingsPath()
   mkdirSync(dirname(settingsPath), { recursive: true })
   writeFileSync(settingsPath, JSON.stringify(settings, null, 2) + "\n")
 }
 
-function detectDefaultAgent(): ReeveSettings["defaultAgent"] {
+function detectDefaultAgent(): GoblinSettings["defaultAgent"] {
   for (const name of ["codex", "claude"] as const) {
     const result = trySpawnSync(["which", name], { stdout: "pipe", stderr: "pipe" })
     if (result.kind === "ok" && result.exitCode === 0) return name
@@ -39,7 +39,7 @@ async function fetchTeams(apiKey: string): Promise<TeamFixture[]> {
 }
 
 export async function cmdInit(): Promise<void> {
-  p.intro("Reeve — Setup")
+  p.intro("Goblin — Setup")
 
   const settings = loadSettings()
   let apiKey = settings.linearApiKey ?? ""
@@ -79,7 +79,7 @@ export async function cmdInit(): Promise<void> {
   }
   if (teams.length === 0) {
     spinner.stop("No teams found")
-    p.log.info("Your Linear account has no teams. Create one at https://linear.app, then re-run reeve init.")
+    p.log.info("Your Linear account has no teams. Create one at https://linear.app, then re-run goblin init.")
     process.exit(1)
   }
   spinner.stop(`Found ${teams.length} team${teams.length > 1 ? "s" : ""}`)
@@ -102,7 +102,7 @@ export async function cmdInit(): Promise<void> {
     for (const m of result.missing) {
       p.log.warn(`Could not ensure workflow state "${m.name}": ${m.error}`)
     }
-    p.log.warn(`Reeve needs the above state${result.missing.length > 1 ? "s" : ""} on team ${team.key}. Create ${result.missing.length > 1 ? "them" : "it"} manually in Linear or re-run with an admin API key.`)
+    p.log.warn(`Goblin needs the above state${result.missing.length > 1 ? "s" : ""} on team ${team.key}. Create ${result.missing.length > 1 ? "them" : "it"} manually in Linear or re-run with an admin API key.`)
   }
 
   settings.defaultTeam = team.key
@@ -110,9 +110,9 @@ export async function cmdInit(): Promise<void> {
   p.outro(
     `Done — global settings saved (team: ${team.key})\n\n` +
     `  Next steps:\n` +
-    `    1. reeve project add <org/repo>   Attach a GitHub repo\n` +
-    `    2. reeve start                    Launch the daemon (background)\n` +
-    `    3. reeve status                   Watch it run\n\n` +
-    `  Run reeve doctor anytime to re-check your environment.`
+    `    1. goblin project add <org/repo>   Attach a GitHub repo\n` +
+    `    2. goblin start                    Launch the daemon (background)\n` +
+    `    3. goblin status                   Watch it run\n\n` +
+    `  Run goblin doctor anytime to re-check your environment.`
   )
 }

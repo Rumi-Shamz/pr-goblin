@@ -1,5 +1,5 @@
 // repo-resolver.ts — Validate GitHub repo identifiers (org/repo).
-// Local paths are not accepted: Reeve manages clones internally via RepoStore.
+// Local paths are not accepted: Goblin manages clones internally via RepoStore.
 
 /**
  * Throws if the string is not a syntactically-valid GitHub `org/repo` identifier.
@@ -9,7 +9,7 @@ export function validateRepoIdentifier(repo: string): void {
   if (repo.startsWith("/") || repo.startsWith("~") || repo.startsWith(".")) {
     throw new Error(
       `Local paths are not supported. Use 'org/repo' format (e.g. 'acme/my-app').\n` +
-      `Reeve will clone and manage the repo automatically.`
+      `Goblin will clone and manage the repo automatically.`
     )
   }
   const parts = repo.split("/")

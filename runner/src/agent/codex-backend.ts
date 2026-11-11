@@ -17,7 +17,7 @@
 
 import { appendFileSync, writeFileSync } from 'fs';
 import { resolve } from 'path';
-import type { ReeveDaemonConfig } from '../config';
+import type { GoblinDaemonConfig } from '../config';
 import type { AgentBackend, SpawnOptions } from './backend';
 import {
   CodexClient,
@@ -101,7 +101,7 @@ export const codexBackend: AgentBackend = {
     task: AgentTask,
     workDir: string,
     prompt: string,
-    _config: ReeveDaemonConfig,
+    _config: GoblinDaemonConfig,
     onEvent: AgentEventHandler,
     options: SpawnOptions,
   ): Promise<SpawnResult> {
@@ -167,7 +167,7 @@ export const codexBackend: AgentBackend = {
     // ── Phase 1: synchronous handshake (must complete before return) ──
     try {
       await client.request('initialize', {
-        clientInfo: { name: 'reeve', version: '0.1.0' },
+        clientInfo: { name: 'goblin', version: '0.1.0' },
       });
 
       if (options.threadId) {

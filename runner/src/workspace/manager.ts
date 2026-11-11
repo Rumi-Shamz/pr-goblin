@@ -3,9 +3,9 @@
 // Callers resolve repoRef → repoDir via RepoStore before invoking these methods.
 //
 // Per-task directory layout:
-//   ~/.reeve/tasks/{id}/              ← task dir (task.taskDir)
-//   ~/.reeve/tasks/{id}/{repo}/       ← git worktree (shared)
-//   ~/.reeve/tasks/{id}/implement/    ← implement agent CWD (task.workDir)
+//   ~/.pr-goblin/tasks/{id}/              ← task dir (task.taskDir)
+//   ~/.pr-goblin/tasks/{id}/{repo}/       ← git worktree (shared)
+//   ~/.pr-goblin/tasks/{id}/implement/    ← implement agent CWD (task.workDir)
 //     CLAUDE.md, .claude/skills/
 //     {repo} → ../{repo}             ← symlink to shared worktree
 
@@ -19,7 +19,7 @@ import { trySpawnSync } from "../utils/spawn"
 export interface WorkspaceInfo {
   identifier: string         // e.g., "PRJ-42"
   branch: string
-  taskDir: string            // ~/.reeve/tasks/{id}/
+  taskDir: string            // ~/.pr-goblin/tasks/{id}/
   workDir: string            // implement agent CWD: {taskDir}/implement/
   worktreeDir: string        // git worktree: {taskDir}/{repo}/
   created: boolean
@@ -62,7 +62,7 @@ export class WorkspaceManager {
    *
    * Layout:
    *   {root}/{sanitized}/           ← wrapper dir (agent CWD)
-   *   {root}/{sanitized}/CLAUDE.md  ← Reeve identity (persistent context)
+   *   {root}/{sanitized}/CLAUDE.md  ← Goblin identity (persistent context)
    *   {root}/{sanitized}/.claude/   ← skills (symlinked from bundled)
    *   {root}/{sanitized}/{repo}/    ← git worktree (user code)
    *
@@ -74,7 +74,7 @@ export class WorkspaceManager {
     const sanitized = sanitizeTaskIdentifier(identifier)
     const branch = `agent/${sanitized}`
     const repoName = basename(repoDir)
-    const taskRoot = this.resolveTaskDir(identifier)       // ~/.reeve/tasks/{id}/
+    const taskRoot = this.resolveTaskDir(identifier)       // ~/.pr-goblin/tasks/{id}/
     const worktreeDir = resolve(taskRoot, repoName)       // {taskRoot}/{repo}/
     const implementDir = resolve(taskRoot, "implement")   // {taskRoot}/implement/
 
@@ -171,7 +171,7 @@ export class WorkspaceManager {
 
   /**
    * Remove only the git worktree for a task, preserving agent dirs (logs).
-   * Used by `reeve task clean` — frees disk without losing observability.
+   * Used by `goblin task clean` — frees disk without losing observability.
    */
   async cleanWorktreeOnly(identifier: string, repoDir: string): Promise<void> {
     const sanitized = sanitizeTaskIdentifier(identifier)
@@ -350,7 +350,7 @@ export class WorkspaceManager {
       const existing = existsSync(excludePath) ? readFileSync(excludePath, "utf-8") : ""
       const missing = EXCLUDE_PATTERNS.filter(p => !existing.includes(p))
       if (missing.length > 0) {
-        appendFileSync(excludePath, "\n# Reeve agent artifacts\n" + missing.join("\n") + "\n")
+        appendFileSync(excludePath, "\n# Goblin agent artifacts\n" + missing.join("\n") + "\n")
       }
     } catch {
       // Non-critical — exclusion is a safety net, not a hard requirement

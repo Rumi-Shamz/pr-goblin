@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>bugpilot widget — test harness</title>
+  <title>pr-goblin widget — test harness</title>
   <style>
     body {
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
@@ -72,7 +72,7 @@
   </style>
 </head>
 <body>
-  <h1>bugpilot test harness</h1>
+  <h1>pr-goblin test harness</h1>
   <p>The widget posts to the endpoint below. Use a local Worker dev server or a mock endpoint.</p>
 
   <div class="card">
@@ -91,14 +91,14 @@
   <div class="card">
     <p style="margin:0; font-size:13px; color:#64748b">
       The feedback button appears at bottom-right.<br/>
-      You can also trigger it programmatically via <code>BugPilot.open()</code> in the browser console.
+      You can also trigger it programmatically via <code>PrGoblin.open()</code> in the browser console.
     </p>
   </div>
 
   <script type="module">
-    import BugPilot from '../src/index.js'
+    import PrGoblin from '../src/index.js'
 
-    window.BugPilot = BugPilot
+    window.PrGoblin = PrGoblin
 
     function init() {
       const endpoint = document.getElementById('endpoint').value
@@ -106,7 +106,7 @@
       const variant = document.getElementById('variant').value
       const side = document.getElementById('side').value
       document.documentElement.classList.toggle('editorial', document.getElementById('editorial').checked)
-      BugPilot.init({
+      PrGoblin.init({
         endpoint,
         projectName,
         position: 'bottom-right',
@@ -118,7 +118,7 @@
     }
 
     window.reinit = () => {
-      BugPilot.destroy()
+      PrGoblin.destroy()
       // Remove DOM nodes left by previous instance
       document.querySelectorAll('.bp-trigger, .bp-dialog, .bp-backdrop').forEach(el => el.remove())
       init()

@@ -1,5 +1,5 @@
 ---
-name: reeve-linear
+name: goblin-linear
 description: |
   Query and mutate Linear issues via the linear-graphql MCP server.
   Use for state transitions, comments, PR linking, and issue lookup.

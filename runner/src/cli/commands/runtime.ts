@@ -18,7 +18,7 @@ export function serveDashboard(opts: {
 
   Bun.serve({
     port: opts.port,
-    hostname: process.env.REEVE_HOST || '0.0.0.0',
+    hostname: process.env.GOBLIN_HOST || '0.0.0.0',
     idleTimeout: 120,
     fetch(req, server) {
       if (new URL(req.url).pathname === '/api/events') {

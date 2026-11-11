@@ -1,11 +1,11 @@
 {
-  "name": "reeve-ai",
+  "name": "pr-goblin",
   "version": "0.0.10",
   "type": "module",
   "description": "Self-hosted coding agent daemon that turns Linear tickets into pull requests using isolated AI agents",
   "main": "./src/index.ts",
   "bin": {
-    "reeve": "./src/cli/app.ts"
+    "goblin": "./src/cli/app.ts"
   },
   "files": [
     "src/**/*.ts",

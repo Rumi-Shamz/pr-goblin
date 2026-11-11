@@ -4,16 +4,16 @@ import { defineConfig } from 'vite'
 
 // Keep in lockstep with VERSION in src/index.js and the git release tag.
 const WIDGET_VERSION = '1.3.1'
-const BANNER = `/* bugpilot-widget v${WIDGET_VERSION} */`
+const BANNER = `/* pr-goblin-widget v${WIDGET_VERSION} */`
 
 // Prepend the version banner to every built bundle (es, umd, iife) so
 // vendored copies in host sites are identifiable. Done as a post-write
 // step because, in Vite lib multi-format mode, a shared output.banner /
 // renderChunk prefix only lands on the ES pass; the umd/iife wrapper +
-// minify drop it. window.BugPilot.version carries the same string at
+// minify drop it. window.PrGoblin.version carries the same string at
 // runtime.
 const versionBanner = {
-  name: 'bugpilot-version-banner',
+  name: 'pr-goblin-version-banner',
   writeBundle(options, bundle) {
     const outDir = options.dir
     for (const file of Object.keys(bundle)) {
@@ -31,11 +31,11 @@ export default defineConfig({
   build: {
     lib: {
       entry: resolve(__dirname, 'src/index.js'),
-      name: 'BugPilot',
+      name: 'PrGoblin',
       formats: ['es', 'umd', 'iife'],
-      // Single default export — IIFE exposes window.BugPilot directly
+      // Single default export — IIFE exposes window.PrGoblin directly
 
-      fileName: (format) => `bugpilot.${format}.js`,
+      fileName: (format) => `pr-goblin.${format}.js`,
     },
     rolldownOptions: {
       // html2canvas is bundled — consumers shouldn't need to install it separately

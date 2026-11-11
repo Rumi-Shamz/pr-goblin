@@ -1,11 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import BugPilot from '../src/index.js'
+import PrGoblin from '../src/index.js'
 import { sanitiseIcon, resolveIcon, DEFAULT_TAB_ICON, DEFAULT_PILL_ICON } from '../src/icon.js'
 import { DragTracker, HIT, DRAG_THRESHOLD, readDock, writeDock, storageKey, clampY } from '../src/dock.js'
 const ENDPOINT = 'https://example.test/feedback'
 
 function init(extra = {}) {
-  return BugPilot.init({ endpoint: ENDPOINT, projectName: 'Test', ...extra })
+  return PrGoblin.init({ endpoint: ENDPOINT, projectName: 'Test', ...extra })
 }
 
 // jsdom has PointerEvent but no pointer capture; the widget guards
@@ -27,7 +27,7 @@ beforeEach(() => {
 })
 
 afterEach(() => {
-  BugPilot.destroy()
+  PrGoblin.destroy()
   document.querySelectorAll('.bp-trigger, .bp-dialog, .bp-backdrop').forEach((el) => el.remove())
   vi.restoreAllMocks()
 })
@@ -60,7 +60,7 @@ describe('variant rendering', () => {
   it('honours side: left and falls back on rubbish values', () => {
     init({ variant: 'tab', side: 'left' })
     expect(document.querySelector('.bp-trigger').getAttribute('data-bp-side')).toBe('left')
-    BugPilot.destroy()
+    PrGoblin.destroy()
     init({ variant: 'sideways', side: 'up' })
     const t = document.querySelector('.bp-trigger')
     expect(t.classList.contains('bp-trigger--pill')).toBe(true)
@@ -103,7 +103,7 @@ describe('hover face wiring (_applyColor)', () => {
     init({ color: 'not-a-colour' })
     const trigger = document.querySelector('.bp-trigger')
     expect(trigger.style.getPropertyValue('--bp-primary')).toBe('')
-    BugPilot.destroy()
+    PrGoblin.destroy()
     init()
     expect(document.querySelector('.bp-trigger').style.getPropertyValue('--bp-primary')).toBe('')
   })
@@ -250,7 +250,7 @@ describe('icon option and sanitiser', () => {
     const icon = '<svg viewBox="0 0 10 10" fill="currentColor"><circle cx="5" cy="5" r="4"/></svg>'
     init({ variant: 'tab', icon })
     expect(document.querySelector('.bp-tab-face circle')).not.toBeNull()
-    BugPilot.destroy()
+    PrGoblin.destroy()
     init({ icon })
     expect(document.querySelector('.bp-trigger-icon circle')).not.toBeNull()
   })

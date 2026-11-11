@@ -41,7 +41,7 @@ export function classifyLinearError(err: unknown): ClassifiedLinearError {
   return {
     kind: "unknown",
     title: "Unexpected error talking to Linear",
-    hint: `Run reeve doctor to check your environment, or retry with REEVE_DEBUG=1.`,
+    hint: `Run goblin doctor to check your environment, or retry with GOBLIN_DEBUG=1.`,
   }
 }
 
@@ -61,7 +61,7 @@ function classifyKnown(err: LinearError): ClassifiedLinearError {
           : "Linear API key rejected",
         hint: err.status === 403
           ? `Generate a key with read+write scope at ${LINEAR_KEY_URL}`
-          : `Get a fresh key at ${LINEAR_KEY_URL} and re-run reeve init.`,
+          : `Get a fresh key at ${LINEAR_KEY_URL} and re-run goblin init.`,
       }
     case "rate-limit":
       return {
@@ -85,7 +85,7 @@ function classifyKnown(err: LinearError): ClassifiedLinearError {
       return {
         kind: "unknown",
         title: "Unexpected Linear error",
-        hint: "Run reeve doctor to check your environment.",
+        hint: "Run goblin doctor to check your environment.",
       }
   }
 }

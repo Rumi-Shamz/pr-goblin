@@ -3,10 +3,10 @@ import { mkdtempSync, rmSync, writeFileSync } from "fs"
 import { tmpdir } from "os"
 import { join, resolve } from "path"
 
-import type { ReeveDaemonConfig } from "../config"
+import type { GoblinDaemonConfig } from "../config"
 import { executeAction } from "./registry"
 
-const CONFIG: ReeveDaemonConfig = {
+const CONFIG: GoblinDaemonConfig = {
   source: "linear",
   linear: {
     apiKey: "lin_api_test",
@@ -40,7 +40,7 @@ async function loadDaemonModule(tag: string): Promise<void> {
 }
 
 describe("daemon clean actions", () => {
-  const savedReeveDir = process.env.REEVE_DIR
+  const savedGoblinDir = process.env.GOBLIN_DIR
   const tempDirs: string[] = []
 
   afterEach(() => {
@@ -48,15 +48,15 @@ describe("daemon clean actions", () => {
     for (const dir of tempDirs.splice(0)) {
       rmSync(dir, { recursive: true, force: true })
     }
-    if (savedReeveDir !== undefined) process.env.REEVE_DIR = savedReeveDir
-    else delete process.env.REEVE_DIR
+    if (savedGoblinDir !== undefined) process.env.GOBLIN_DIR = savedGoblinDir
+    else delete process.env.GOBLIN_DIR
   })
 
   test("cleanTask resolves repo identifier before cleaning the worktree", async () => {
-    const reeveDir = mkdtempSync(join(tmpdir(), "reeve-daemon-actions-"))
-    tempDirs.push(reeveDir)
+    const goblinDir = mkdtempSync(join(tmpdir(), "goblin-daemon-actions-"))
+    tempDirs.push(goblinDir)
 
-    writeFileSync(resolve(reeveDir, "state.json"), JSON.stringify({
+    writeFileSync(resolve(goblinDir, "state.json"), JSON.stringify({
       version: 1,
       tasks: [{
         id: "issue-1",
@@ -80,8 +80,8 @@ describe("daemon clean actions", () => {
     const calls: Array<[string, string]> = []
     const repoStoreArgs: string[] = []
     mock.module("../paths", () => ({
-      REEVE_DIR: reeveDir,
-      LOGS_DIR: resolve(reeveDir, "logs"),
+      GOBLIN_DIR: goblinDir,
+      LOGS_DIR: resolve(goblinDir, "logs"),
     }))
     mock.module("../workspace/manager", () => ({
       WorkspaceManager: class {
@@ -117,10 +117,10 @@ describe("daemon clean actions", () => {
   })
 
   test("cleanAllDone passes repo identifiers through to the workspace manager", async () => {
-    const reeveDir = mkdtempSync(join(tmpdir(), "reeve-daemon-actions-"))
-    tempDirs.push(reeveDir)
+    const goblinDir = mkdtempSync(join(tmpdir(), "goblin-daemon-actions-"))
+    tempDirs.push(goblinDir)
 
-    writeFileSync(resolve(reeveDir, "state.json"), JSON.stringify({
+    writeFileSync(resolve(goblinDir, "state.json"), JSON.stringify({
       version: 1,
       tasks: [{
         id: "issue-1",
@@ -144,8 +144,8 @@ describe("daemon clean actions", () => {
     const calls: Array<[string, string]> = []
     const repoStoreArgs: string[] = []
     mock.module("../paths", () => ({
-      REEVE_DIR: reeveDir,
-      LOGS_DIR: resolve(reeveDir, "logs"),
+      GOBLIN_DIR: goblinDir,
+      LOGS_DIR: resolve(goblinDir, "logs"),
     }))
     mock.module("../workspace/manager", () => ({
       WorkspaceManager: class {

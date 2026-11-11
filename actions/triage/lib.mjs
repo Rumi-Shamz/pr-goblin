@@ -9,7 +9,7 @@ export function parseStructuredBlock(body) {
   // the issue body, so a marker smuggled into user-supplied text (which sits
   // above it) can never shadow it. The worker also neutralises the markers
   // in user text; this is the parser-side half of the same defence.
-  const matches = [...body.matchAll(/<!-- bugpilot:structured\n([\s\S]*?)\nbugpilot:end -->/g)]
+  const matches = [...body.matchAll(/<!-- pr-goblin:structured\n([\s\S]*?)\npr-goblin:end -->/g)]
   if (!matches.length) return null
   try {
     return JSON.parse(matches[matches.length - 1][1])
@@ -27,7 +27,7 @@ export function buildUserMessage(issue, structured) {
 }
 
 export function buildComment(triage) {
-  const lines = ['### bugpilot triage', '']
+  const lines = ['### pr-goblin triage', '']
 
   const classLabel = {
     bug: 'Bug',

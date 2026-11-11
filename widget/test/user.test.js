@@ -1,11 +1,11 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import BugPilot from '../src/index.js'
+import PrGoblin from '../src/index.js'
 import { sanitiseUser, USER_FIELD_MAX } from '../src/user.js'
 
 const ENDPOINT = 'https://example.test/feedback'
 
 afterEach(() => {
-  BugPilot.destroy()
+  PrGoblin.destroy()
   document.querySelectorAll('.bp-trigger, .bp-dialog, .bp-backdrop').forEach((el) => el.remove())
   vi.restoreAllMocks()
 })
@@ -31,7 +31,7 @@ describe('user option', () => {
     const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
       new Response(JSON.stringify({ ok: true, issueUrl: 'https://github.com/o/r/issues/57', issueNumber: 57 }), { status: 201 }),
     )
-    BugPilot.init({ endpoint: ENDPOINT, user: { name: 'Ada', login: 'ada' } })
+    PrGoblin.init({ endpoint: ENDPOINT, user: { name: 'Ada', login: 'ada' } })
     fillAndSubmit()
     await vi.waitFor(() => expect(fetchMock).toHaveBeenCalled())
     const sent = JSON.parse(fetchMock.mock.calls[0][1].body)
@@ -46,7 +46,7 @@ describe('user option', () => {
     const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
       new Response(JSON.stringify({ ok: true, issueUrl: 'https://github.com/o/r/issues/3' }), { status: 201 }),
     )
-    BugPilot.init({ endpoint: ENDPOINT })
+    PrGoblin.init({ endpoint: ENDPOINT })
     fillAndSubmit()
     await vi.waitFor(() => expect(fetchMock).toHaveBeenCalled())
     await vi.waitFor(() => expect(document.querySelector('#bp-status').textContent).toContain('submitted'))
@@ -57,7 +57,7 @@ describe('user option', () => {
     const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
       new Response(JSON.stringify({ issueUrl: 'https://github.com/o/r/issues/2' }), { status: 201 }),
     )
-    BugPilot.init({ endpoint: ENDPOINT })
+    PrGoblin.init({ endpoint: ENDPOINT })
     fillAndSubmit()
     await vi.waitFor(() => expect(fetchMock).toHaveBeenCalled())
     expect(JSON.parse(fetchMock.mock.calls[0][1].body).user).toBeNull()

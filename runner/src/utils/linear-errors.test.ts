@@ -62,7 +62,7 @@ describe("classifyLinearError", () => {
     const info = classifyLinearError(err)
 
     expect(info.kind).toBe("unknown")
-    expect(info.hint.toLowerCase()).toContain("reeve doctor")
+    expect(info.hint.toLowerCase()).toContain("goblin doctor")
   })
 
   test("unknown: non-Error value (string) does not crash", () => {

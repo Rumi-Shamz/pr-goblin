@@ -21,17 +21,17 @@ const VERDICT_CONTRACT = `
 After completing your review, write a verdict file:
 
 \`\`\`bash
-mkdir -p .reeve
+mkdir -p .pr-goblin
 \`\`\`
 
 If no critical/high-severity findings remain after judgment:
 \`\`\`bash
-echo '{"verdict":"pass"}' > .reeve/review-verdict.json
+echo '{"verdict":"pass"}' > .pr-goblin/review-verdict.json
 \`\`\`
 
 If confirmed critical/high-severity findings exist:
 \`\`\`bash
-echo '{"verdict":"fail"}' > .reeve/review-verdict.json
+echo '{"verdict":"fail"}' > .pr-goblin/review-verdict.json
 \`\`\``
 
 // ── Input/output schemas ──────────────────────────────────────
@@ -56,18 +56,18 @@ export type ReviewOutput = z.infer<typeof reviewOutput>
 
 export async function executeReview(input: ReviewInput): Promise<ReviewOutput> {
   // 1. Resolve context from env vars (hook-injected) or explicit input
-  const worktree = input.worktree || process.env.REEVE_WORKTREE
-  const agentCwd = process.env.REEVE_WORKDIR || worktree
-  const prUrl = input.prUrl || process.env.REEVE_PR_URL || undefined
-  const repo = process.env.REEVE_REPO || worktree
-  const reviewAgent = input.agent || process.env.REEVE_REVIEW_AGENT || "codex"
-  const identifier = input.identifier || process.env.REEVE_IDENTIFIER
+  const worktree = input.worktree || process.env.GOBLIN_WORKTREE
+  const agentCwd = process.env.GOBLIN_WORKDIR || worktree
+  const prUrl = input.prUrl || process.env.GOBLIN_PR_URL || undefined
+  const repo = process.env.GOBLIN_REPO || worktree
+  const reviewAgent = input.agent || process.env.GOBLIN_REVIEW_AGENT || "codex"
+  const identifier = input.identifier || process.env.GOBLIN_IDENTIFIER
 
   if (!identifier) {
-    throw new Error("No identifier: pass as argument or set REEVE_IDENTIFIER")
+    throw new Error("No identifier: pass as argument or set GOBLIN_IDENTIFIER")
   }
   if (!worktree) {
-    throw new Error("No worktree: set REEVE_WORKTREE or pass --worktree")
+    throw new Error("No worktree: set GOBLIN_WORKTREE or pass --worktree")
   }
   if (!existsSync(worktree)) {
     throw new Error(`Worktree not found: ${worktree}`)
@@ -80,7 +80,7 @@ export async function executeReview(input: ReviewInput): Promise<ReviewOutput> {
   const basePrompt = buildReviewPrompt({
     task: {
       identifier,
-      title: process.env.REEVE_TITLE || identifier,
+      title: process.env.GOBLIN_TITLE || identifier,
       description: "",
       labels: [],
     },
@@ -132,7 +132,7 @@ export async function executeReview(input: ReviewInput): Promise<ReviewOutput> {
 // ── Helpers (exported for testing) ────────────────────────────
 
 export function readVerdict(worktree: string, exitCode: number): "pass" | "fail" | "error" {
-  const verdictPath = resolve(worktree, ".reeve", "review-verdict.json")
+  const verdictPath = resolve(worktree, ".pr-goblin", "review-verdict.json")
 
   if (existsSync(verdictPath)) {
     try {

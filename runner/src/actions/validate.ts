@@ -3,12 +3,12 @@ import { registerAction } from "./registry"
 import { loadConfig, loadSettings } from "../config"
 import { existsSync } from "fs"
 import { resolve } from "path"
-import { REEVE_DIR } from "../paths"
+import { GOBLIN_DIR } from "../paths"
 import { trySpawnSync } from "../utils/spawn"
 
 registerAction({
   name: "validate",
-  description: "Validate Reeve configuration files",
+  description: "Validate Goblin configuration files",
   input: z.object({}),
   output: z.any(),
   requiresDaemon: false,
@@ -16,7 +16,7 @@ registerAction({
     const checks: Array<{ name: string; ok: boolean; detail?: string }> = []
 
     // 1. settings.json exists
-    const settingsPath = resolve(REEVE_DIR, "settings.json")
+    const settingsPath = resolve(GOBLIN_DIR, "settings.json")
     checks.push({
       name: "settings.json exists",
       ok: existsSync(settingsPath),

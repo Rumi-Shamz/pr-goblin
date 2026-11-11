@@ -2,13 +2,13 @@
 
 import { z } from "zod"
 import type { Kernel } from "../kernel/kernel"
-import type { ReeveDaemonConfig } from "../config"
+import type { GoblinDaemonConfig } from "../config"
 
 // ── Action context (dependency injection) ─────────────────────
 
 export interface ActionContext {
   kernel?: Kernel              // Only available when daemon is running
-  config: ReeveDaemonConfig
+  config: GoblinDaemonConfig
   projects: Array<{ slug: string; repo: string }>
   /**
    * Optional hook to activate (start) the kernel. Called by actions such as

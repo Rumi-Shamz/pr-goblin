@@ -1,7 +1,7 @@
 import { lstatSync, symlinkSync, readFileSync, existsSync } from "fs"
 import { resolve, basename, join } from "path"
 import type { Task, AgentResult } from "../types"
-import type { ReeveDaemonConfig } from "../../config"
+import type { GoblinDaemonConfig } from "../../config"
 import type { PostAgent, PostAgentContext, PostChainResult, PostAgentResult } from "./types"
 import { setupAgentContext } from "../../workspace/context-injector"
 
@@ -9,7 +9,7 @@ export type SpawnPostAgentFn = (
   task: Task,
   workDir: string,
   prompt: string,
-  config: ReeveDaemonConfig,
+  config: GoblinDaemonConfig,
   agentName?: string,
 ) => Promise<AgentResult>
 
@@ -46,7 +46,7 @@ function prepareAgentDir(
  */
 export async function runPostAgents(
   task: Task,
-  config: ReeveDaemonConfig,
+  config: GoblinDaemonConfig,
   agents: PostAgent[],
   spawnFn: SpawnPostAgentFn,
   postConfig?: Record<string, string>,

@@ -47,7 +47,7 @@ export function resolveIcon(markup, variant) {
   if (markup === undefined || markup === null || markup === '') return fallback
   const clean = sanitiseIcon(markup)
   if (!clean) {
-    console.warn('[bugpilot] icon rejected: must be inline <svg> markup with no script, on* handlers or javascript: URLs; using the default glyph')
+    console.warn('[pr-goblin] icon rejected: must be inline <svg> markup with no script, on* handlers or javascript: URLs; using the default glyph')
     return fallback
   }
   return clean

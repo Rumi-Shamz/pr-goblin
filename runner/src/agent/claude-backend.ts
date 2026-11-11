@@ -7,7 +7,7 @@
 
 import { appendFileSync, writeFileSync } from 'fs';
 import { resolve } from 'path';
-import type { ReeveDaemonConfig } from '../config';
+import type { GoblinDaemonConfig } from '../config';
 import type { AgentBackend, SpawnOptions } from './backend';
 import { prepareClaudeSandbox } from './claude-sandbox';
 import { parseClaudeLine } from './claude-parser';
@@ -75,7 +75,7 @@ export const claudeBackend: AgentBackend = {
     task: AgentTask,
     workDir: string,
     prompt: string,
-    _config: ReeveDaemonConfig,
+    _config: GoblinDaemonConfig,
     onEvent: AgentEventHandler,
     options: SpawnOptions,
   ): Promise<SpawnResult> {

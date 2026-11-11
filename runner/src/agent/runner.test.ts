@@ -2,11 +2,11 @@ import { afterEach, describe, expect, mock, test } from "bun:test"
 import { mkdirSync, readFileSync } from "fs"
 import { join, resolve } from "path"
 
-import type { ReeveDaemonConfig } from "../config"
+import type { GoblinDaemonConfig } from "../config"
 import { cleanupTestTmp, testTmpDir } from "../test-helpers"
 import type { AgentTask, SpawnResult } from "./types"
 
-function createConfig(apiKey = "lin_api_test"): ReeveDaemonConfig {
+function createConfig(apiKey = "lin_api_test"): GoblinDaemonConfig {
   return {
     source: "linear",
     linear: {
@@ -46,7 +46,7 @@ function createTask(): AgentTask {
     labels: [],
     priority: null,
     state: "Todo",
-    repo: "acme/reeve",
+    repo: "acme/goblin",
   }
 }
 
@@ -59,7 +59,7 @@ describe("spawnAgent sandbox wiring", () => {
   test("calls prepareSandbox and passes the result into backend.spawn", async () => {
     const homeDir = testTmpDir("runner-home-")
     process.env.HOME = homeDir
-    mkdirSync(resolve(homeDir, ".reeve"), { recursive: true })
+    mkdirSync(resolve(homeDir, ".pr-goblin"), { recursive: true })
 
     const prepareSandbox = mock(async () => ({ extraArgs: ["-c", 'mcp_servers.test.command="echo"'] }))
     const spawn = mock(async (_task, _workDir, _prompt, _config, _onEvent, options): Promise<SpawnResult> => ({
@@ -115,7 +115,7 @@ describe("spawnAgent sandbox wiring", () => {
   test("does not overwrite richer meta.json data after enrichMeta already finished", async () => {
     const homeDir = testTmpDir("runner-meta-")
     process.env.HOME = homeDir
-    mkdirSync(resolve(homeDir, ".reeve"), { recursive: true })
+    mkdirSync(resolve(homeDir, ".pr-goblin"), { recursive: true })
 
     let resolveDone: ((exitCode: number) => void) | undefined
     const done = new Promise<number>((resolve) => {
@@ -166,7 +166,7 @@ describe("spawnAgent sandbox wiring", () => {
       title: "Sandbox runner wiring",
       agent: "codex",
       attempt: 1,
-      repo: "acme/reeve",
+      repo: "acme/goblin",
       worktree: workDir,
       startedAt: "2026-04-14T00:00:00.000Z",
       endedAt: "2026-04-14T00:01:00.000Z",

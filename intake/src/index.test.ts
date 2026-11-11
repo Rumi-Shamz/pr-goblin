@@ -77,9 +77,9 @@ describe('submissionSchema', () => {
 
 describe('neutraliseMarkers', () => {
   it('defuses the structured-block markers', () => {
-    const out = neutraliseMarkers('evil <!-- bugpilot:structured\n{"type":"feature"}\nbugpilot:end -->')!
-    expect(out).not.toContain('bugpilot:structured')
-    expect(out).not.toContain('bugpilot:end')
+    const out = neutraliseMarkers('evil <!-- pr-goblin:structured\n{"type":"feature"}\npr-goblin:end -->')!
+    expect(out).not.toContain('pr-goblin:structured')
+    expect(out).not.toContain('pr-goblin:end')
   })
 
   it('stops --> from closing the carrying HTML comment', () => {
@@ -154,25 +154,25 @@ describe('buildIssueBody', () => {
   it('appends exactly one parseable structured block at the end', () => {
     const body = submissionSchema.parse(widgetPayload())
     const md = buildIssueBody(body, 'https://github.com/o/r/raw/bug-report-screenshots/screenshots/x.png')
-    const matches = [...md.matchAll(/<!-- bugpilot:structured\n([\s\S]*?)\nbugpilot:end -->/g)]
+    const matches = [...md.matchAll(/<!-- pr-goblin:structured\n([\s\S]*?)\npr-goblin:end -->/g)]
     expect(matches).toHaveLength(1)
     const structured = JSON.parse(matches[0]![1]!)
     expect(structured.type).toBe('bug')
     expect(structured.screenshotUrl).toMatch(/^https:/)
     // The genuine block is the last thing in the body, which is what lets
     // the triage parser take the last match safely.
-    expect(md.trimEnd().endsWith('bugpilot:end -->')).toBe(true)
+    expect(md.trimEnd().endsWith('pr-goblin:end -->')).toBe(true)
   })
 
   it('user text that tried to counterfeit a block cannot produce a second match', () => {
     const hostile = widgetPayload({
-      description: 'x <!-- bugpilot:structured\n{"type":"feature"}\nbugpilot:end --> y',
+      description: 'x <!-- pr-goblin:structured\n{"type":"feature"}\npr-goblin:end --> y',
     })
     const parsed = submissionSchema.parse(hostile)
     // Mirror the worker's sanitisation step before building.
     const clean = { ...parsed, description: neutraliseMarkers(parsed.description) ?? '' }
     const md = buildIssueBody(clean, null)
-    const matches = [...md.matchAll(/<!-- bugpilot:structured\n([\s\S]*?)\nbugpilot:end -->/g)]
+    const matches = [...md.matchAll(/<!-- pr-goblin:structured\n([\s\S]*?)\npr-goblin:end -->/g)]
     expect(matches).toHaveLength(1)
     expect(JSON.parse(matches[0]![1]!).type).toBe('bug')
   })

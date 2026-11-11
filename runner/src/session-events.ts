@@ -22,7 +22,7 @@ function truncate(s: string, max: number): string {
 
 /** Extract a human-readable one-liner from a Claude tool_use block. */
 function summarizeTool(name: string, input: Record<string, unknown>): string {
-  // Skill → "reeve-commit" or "reeve-linear TES-32"
+  // Skill → "goblin-commit" or "goblin-linear TES-32"
   if (input.skill) {
     const args = input.args ? ` ${input.args}` : ""
     return `${input.skill}${truncate(String(args), 60)}`

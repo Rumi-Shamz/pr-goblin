@@ -1,4 +1,4 @@
-import type { ReeveSettings } from "./config"
+import type { GoblinSettings } from "./config"
 import { trySpawnSync, type SpawnResult } from "./utils/spawn"
 
 type RuntimeHealthOptions = {
@@ -137,7 +137,7 @@ export function hasAnyAgent(agents: AgentHealth[]): boolean {
 }
 
 export function getSetupEntryHealth(
-  settings: ReeveSettings,
+  settings: GoblinSettings,
   options?: RuntimeHealthOptions,
 ): SetupEntryHealth {
   const execSync = options?.execSync ?? Bun.spawnSync
@@ -160,7 +160,7 @@ export function getSetupEntryHealth(
 }
 
 export function getRuntimeHealth(
-  settings: ReeveSettings,
+  settings: GoblinSettings,
   options?: RuntimeHealthOptions,
 ): RuntimeHealth {
   const execSync = options?.execSync ?? Bun.spawnSync

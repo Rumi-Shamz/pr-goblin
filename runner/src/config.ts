@@ -1,5 +1,5 @@
 // config.ts — Configuration loader
-// All config lives in ~/.reeve/settings.json
+// All config lives in ~/.pr-goblin/settings.json
 
 import { existsSync, readFileSync, mkdirSync, writeFileSync } from "fs"
 import { resolve } from "path"
@@ -53,7 +53,7 @@ export interface DashboardConfig {
 
 export type SourceType = 'linear'
 
-export interface ReeveDaemonConfig {
+export interface GoblinDaemonConfig {
   source: SourceType
   linear?: LinearConfig
   workspace: WorkspaceConfig
@@ -87,13 +87,13 @@ const settingsSchema = z.object({
   }).optional(),
 }).catchall(z.unknown())
 
-export type ReeveSettings = z.infer<typeof settingsSchema>
+export type GoblinSettings = z.infer<typeof settingsSchema>
 
 export function getSettingsPath(): string {
-  return resolve(process.env.REEVE_DIR || resolve(process.env.HOME || "/tmp", ".reeve"), "settings.json")
+  return resolve(process.env.GOBLIN_DIR || resolve(process.env.HOME || "/tmp", ".pr-goblin"), "settings.json")
 }
 
-export function saveSettings(settings: ReeveSettings): void {
+export function saveSettings(settings: GoblinSettings): void {
   const settingsPath = getSettingsPath()
   const dir = resolve(settingsPath, "..")
   if (!existsSync(dir)) {
@@ -117,11 +117,11 @@ const LINEAR_DEFAULTS: LinearConfig = {
   },
 }
 
-const DEFAULTS: ReeveDaemonConfig = {
+const DEFAULTS: GoblinDaemonConfig = {
   source: "linear",
   linear: LINEAR_DEFAULTS,
   workspace: {
-    root: "~/.reeve/workspaces",
+    root: "~/.pr-goblin/workspaces",
   },
   agent: {
     maxRounds: 1,
@@ -140,7 +140,7 @@ const DEFAULTS: ReeveDaemonConfig = {
   projects: [],
 }
 
-export function loadSettings(): ReeveSettings {
+export function loadSettings(): GoblinSettings {
   const settingsPath = getSettingsPath()
   if (!existsSync(settingsPath)) return {}
   try {
@@ -159,7 +159,7 @@ function resolvePath(value: string): string {
   return resolve(expanded)
 }
 
-export function loadConfig(): ReeveDaemonConfig {
+export function loadConfig(): GoblinDaemonConfig {
   const settings = loadSettings()
 
   const projects: ProjectConfig[] = (settings.projects ?? []).map((p) => ({
@@ -174,7 +174,7 @@ export function loadConfig(): ReeveDaemonConfig {
 
   const sourceType = (settings.source as SourceType | undefined) ?? DEFAULTS.source
 
-  const config: ReeveDaemonConfig = {
+  const config: GoblinDaemonConfig = {
     source: sourceType,
     linear: sourceType === 'linear' ? {
       ...LINEAR_DEFAULTS,

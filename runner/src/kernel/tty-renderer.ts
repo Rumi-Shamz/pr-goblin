@@ -1,4 +1,4 @@
-// kernel/tty-renderer.ts — Pretty terminal output for `reeve run` foreground mode.
+// kernel/tty-renderer.ts — Pretty terminal output for `goblin run` foreground mode.
 // Subscribes to kernel SSE events → human-readable event stream.
 // One active spinner at a time; completed events scroll above it.
 

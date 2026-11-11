@@ -46,7 +46,7 @@ export function registerSystemCommands(cli: CAC): void {
           ok: bunOk,
           label: 'Bun',
           detail: bunVersion,
-          fix: bunOk ? undefined : ['curl -fsSL https://reeve.run/install.sh | bash'],
+          fix: bunOk ? undefined : ['Install Bun: https://bun.sh'],
         },
         {
           ok: health.ghInstalled && health.ghAuthenticated,
@@ -94,13 +94,13 @@ export function registerSystemCommands(cli: CAC): void {
           ok: health.hasApiKey,
           label: 'Linear API key',
           detail: health.hasApiKey ? 'configured' : 'missing',
-          fix: health.hasApiKey ? undefined : ['reeve init'],
+          fix: health.hasApiKey ? undefined : ['goblin init'],
         },
         {
           ok: health.projectCount > 0,
           label: 'Projects',
           detail: `${health.projectCount} configured`,
-          fix: health.projectCount > 0 ? undefined : ['reeve project add <org/repo>'],
+          fix: health.projectCount > 0 ? undefined : ['goblin project add <org/repo>'],
         },
       ]
 
@@ -137,7 +137,7 @@ export function registerSystemCommands(cli: CAC): void {
         process.exit(allOk ? 0 : 1)
       }
 
-      console.log(`${pc.bold('reeve doctor')}${pc.dim(' \u2014 checking environment')}\n`)
+      console.log(`${pc.bold('goblin doctor')}${pc.dim(' \u2014 checking environment')}\n`)
       renderDoctor(rows)
 
       const issues = rows.filter((r) => !r.ok).length
@@ -148,7 +148,7 @@ export function registerSystemCommands(cli: CAC): void {
         console.log(
           `${pc.red(`\u274c ${issues} issue${issues > 1 ? 's' : ''} found`)}` +
             pc.dim(' \u2014 run the commands above, then re-run ') +
-            pc.bold('reeve doctor'),
+            pc.bold('goblin doctor'),
         )
       }
       process.exit(allOk ? 0 : 1)

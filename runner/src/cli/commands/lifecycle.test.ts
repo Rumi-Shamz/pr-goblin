@@ -19,33 +19,33 @@ describe("buildRunNotReadyMessage", () => {
     expect(msg).toContain("✗")
     expect(msg).toContain("No Linear API key configured")
     expect(msg).toContain("No projects configured")
-    expect(msg).toContain("reeve init")
-    expect(msg).toContain("reeve start")
+    expect(msg).toContain("goblin init")
+    expect(msg).toContain("goblin start")
   })
 
   it("handles single issue without a bulleted list fallback", () => {
     const msg = buildRunNotReadyMessage(["Codex CLI not installed"])
     expect(msg).toContain("Codex CLI not installed")
-    expect(msg).toContain("reeve init")
+    expect(msg).toContain("goblin init")
   })
 })
 
 describe("buildDaemonStartedBanner", () => {
   it("shows 3 actionable lines in start-friendly format", () => {
-    const out = buildDaemonStartedBanner({ pid: 1234, port: 14500, logPath: "/tmp/reeve.log", dashboardEnabled: true })
+    const out = buildDaemonStartedBanner({ pid: 1234, port: 14500, logPath: "/tmp/goblin.log", dashboardEnabled: true })
     const lines = out.split("\n").filter(l => l.trim().length > 0)
     expect(lines.length).toBe(3)
     expect(lines[0]).toContain("http://localhost:14500")
-    expect(out).toContain("/tmp/reeve.log")
-    expect(out).toContain("reeve stop")
+    expect(out).toContain("/tmp/goblin.log")
+    expect(out).toContain("goblin stop")
   })
 
   it("hides the dashboard URL when dashboard is disabled", () => {
-    const out = buildDaemonStartedBanner({ pid: 1234, port: 14500, logPath: "/tmp/reeve.log", dashboardEnabled: false })
+    const out = buildDaemonStartedBanner({ pid: 1234, port: 14500, logPath: "/tmp/goblin.log", dashboardEnabled: false })
     expect(out).not.toContain("http://")
     expect(out).toContain("CLI-only")
-    expect(out).toContain("/tmp/reeve.log")
-    expect(out).toContain("reeve stop")
+    expect(out).toContain("/tmp/goblin.log")
+    expect(out).toContain("goblin stop")
   })
 })
 
@@ -53,7 +53,7 @@ describe("buildAlreadyRunningMessage", () => {
   it("names the existing pid and suggests stop", () => {
     const msg = buildAlreadyRunningMessage(9999)
     expect(msg).toContain("9999")
-    expect(msg).toContain("reeve stop")
+    expect(msg).toContain("goblin stop")
   })
 })
 
@@ -62,7 +62,7 @@ afterEach(() => {
 })
 
 async function loadStartCli(opts: { ready: boolean }) {
-  const reeveDir = mkdtempSync(join(tmpdir(), "reeve-start-test-"))
+  const goblinDir = mkdtempSync(join(tmpdir(), "goblin-start-test-"))
   const encoder = new TextEncoder()
   const writePid = mock(() => {})
 
@@ -83,7 +83,7 @@ async function loadStartCli(opts: { ready: boolean }) {
           backlog: "Backlog",
         },
       },
-      workspace: { root: "/tmp/reeve-workspaces" },
+      workspace: { root: "/tmp/goblin-workspaces" },
       agent: {
         maxRounds: 1,
         stallTimeoutMs: 300_000,
@@ -96,7 +96,7 @@ async function loadStartCli(opts: { ready: boolean }) {
       projects: [],
     }),
     loadSettings: () => ({}),
-    getSettingsPath: () => join(reeveDir, "settings.json"),
+    getSettingsPath: () => join(goblinDir, "settings.json"),
   }))
 
   mock.module("../../runtime-health", () => ({
@@ -152,7 +152,7 @@ async function loadStartCli(opts: { ready: boolean }) {
   try {
     const { cac } = await import("cac")
     const { registerLifecycleCommands } = await import(`./lifecycle?start-test=${Date.now()}-${Math.random()}`)
-    const cli = cac("reeve")
+    const cli = cac("goblin")
     registerLifecycleCommands(cli)
     return {
       cli,
@@ -222,7 +222,7 @@ async function loadStopCli(homeDir: string) {
   try {
     const { cac } = await import("cac")
     const { registerLifecycleCommands } = await import(`./lifecycle?stop-test=${Date.now()}-${Math.random()}`)
-    const cli = cac("reeve")
+    const cli = cac("goblin")
     registerLifecycleCommands(cli)
     return {
       cli,
@@ -274,7 +274,7 @@ describe("cmdStart", () => {
     })
 
     try {
-      await cli.parse(["bun", "/usr/local/bin/reeve", "start"])
+      await cli.parse(["bun", "/usr/local/bin/goblin", "start"])
 
       const spawnArgs = spawn.mock.calls[0]?.[0] as string[] | undefined
       expect(spawnArgs).toBeDefined()
@@ -337,19 +337,19 @@ describe("findPidByPort", () => {
 })
 
 describe("cmdStop", () => {
-  it("ignores legacy ~/.config/reeve/reeve.pid", async () => {
-    const homeDir = mkdtempSync(join(tmpdir(), "reeve-stop-test-"))
-    mkdirSync(join(homeDir, ".config", "reeve"), { recursive: true })
-    writeFileSync(join(homeDir, ".config", "reeve", "reeve.pid"), "4242\n")
+  it("ignores legacy ~/.config/pr-goblin/goblin.pid", async () => {
+    const homeDir = mkdtempSync(join(tmpdir(), "goblin-stop-test-"))
+    mkdirSync(join(homeDir, ".config", "goblin"), { recursive: true })
+    writeFileSync(join(homeDir, ".config", "goblin", "goblin.pid"), "4242\n")
 
     const { cli, kill, logs, removePid, restore } = await loadStopCli(homeDir)
 
     try {
-      await cli.parse(["bun", "/usr/local/bin/reeve", "stop"])
+      await cli.parse(["bun", "/usr/local/bin/goblin", "stop"])
 
       expect(kill).not.toHaveBeenCalled()
       expect(removePid).not.toHaveBeenCalled()
-      expect(logs).toContain("reeve is not running")
+      expect(logs).toContain("goblin is not running")
     } finally {
       restore()
     }

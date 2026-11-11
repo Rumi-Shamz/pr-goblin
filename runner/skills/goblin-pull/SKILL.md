@@ -1,5 +1,5 @@
 ---
-name: reeve-pull
+name: goblin-pull
 description: |
   Sync the current branch with origin/main via merge.
   Use when your branch is behind main or push was rejected.

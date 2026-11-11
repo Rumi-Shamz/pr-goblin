@@ -3,11 +3,11 @@ import { mkdirSync, mkdtempSync, rmSync } from "fs"
 import { join } from "path"
 import { tmpdir } from "os"
 
-import type { ReeveDaemonConfig } from "../config"
+import type { GoblinDaemonConfig } from "../config"
 import type { Source } from "./source"
 import type { KernelConfig, Task } from "./types"
 
-function createConfig(): ReeveDaemonConfig {
+function createConfig(): GoblinDaemonConfig {
   return {
     source: "linear",
     linear: {
@@ -79,17 +79,17 @@ function createTask(overrides: Partial<Task> = {}): Task {
 }
 
 describe("Kernel runtime behavior", () => {
-  let reeveDir: string
+  let goblinDir: string
 
   beforeAll(() => {
-    reeveDir = mkdtempSync(join(tmpdir(), "reeve-kernel-runtime-"))
-    process.env.REEVE_DIR = reeveDir
-    process.env.REEVE_NO_UPDATE_CHECK = "1"
+    goblinDir = mkdtempSync(join(tmpdir(), "goblin-kernel-runtime-"))
+    process.env.GOBLIN_DIR = goblinDir
+    process.env.GOBLIN_NO_UPDATE_CHECK = "1"
   })
 
   beforeEach(() => {
-    rmSync(reeveDir, { recursive: true, force: true })
-    mkdirSync(reeveDir, { recursive: true })
+    rmSync(goblinDir, { recursive: true, force: true })
+    mkdirSync(goblinDir, { recursive: true })
   })
 
   afterEach(() => {
@@ -97,9 +97,9 @@ describe("Kernel runtime behavior", () => {
   })
 
   afterAll(() => {
-    rmSync(reeveDir, { recursive: true, force: true })
-    delete process.env.REEVE_DIR
-    delete process.env.REEVE_NO_UPDATE_CHECK
+    rmSync(goblinDir, { recursive: true, force: true })
+    delete process.env.GOBLIN_DIR
+    delete process.env.GOBLIN_NO_UPDATE_CHECK
   })
 
   test("dispatch passes retryCount + 1 as the agent attempt", async () => {
@@ -143,7 +143,7 @@ describe("Kernel runtime behavior", () => {
   })
 
   test("start keeps configured project repos as repo identifiers", async () => {
-    const workspaceRoot = join(reeveDir, "workspaces")
+    const workspaceRoot = join(goblinDir, "workspaces")
 
     class MockWorkspaceManager {
       async cleanOrphans(): Promise<string[]> {
@@ -166,7 +166,7 @@ describe("Kernel runtime behavior", () => {
   })
 
   test("dispatch resolves repo identifier through RepoStore before invoking workspace", async () => {
-    const workspaceRoot = join(reeveDir, "workspaces")
+    const workspaceRoot = join(goblinDir, "workspaces")
     const ensureCalls: string[] = []
     const fetchCalls: string[] = []
     const createCalls: Array<[string, string, string | undefined]> = []

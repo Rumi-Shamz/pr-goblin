@@ -29,7 +29,7 @@ describe('CodexClient', () => {
     const client = new CodexClient(writable, () => {}, () => ({}));
     readable.onLine((line) => client.handleLine(line));
 
-    const responsePromise = client.request('initialize', { clientInfo: { name: 'reeve', version: '0' } });
+    const responsePromise = client.request('initialize', { clientInfo: { name: 'goblin', version: '0' } });
 
     // Verify outgoing
     expect(received.length).toBe(1);

@@ -35,7 +35,7 @@ export function registerTaskCommands(cli: CAC): void {
   cli.command('status', 'Task state counts').action(async (opts: { json: boolean }) => {
     await runAction('status', {}, { json: opts.json }, (data: unknown) => {
       const status = data as Record<string, number>
-      console.log('reeve status:')
+      console.log('goblin status:')
       for (const [state, count] of Object.entries(status)) {
         if (state === 'total') continue
         console.log(`  ${stateIcon(state)} ${state}: ${count}`)
@@ -79,7 +79,7 @@ export function registerTaskCommands(cli: CAC): void {
       if (opts.daemon) {
         const logPath = resolve(getSettingsPath(), '..', 'logs', 'daemon.log')
         if (!existsSync(logPath)) {
-          console.error('No daemon log found. Start with: reeve start')
+          console.error('No daemon log found. Start with: goblin start')
           process.exit(1)
         }
         if (opts.follow) {
@@ -167,7 +167,7 @@ export function registerTaskCommands(cli: CAC): void {
     .option('--purge', 'Purge any caches')
     .action(async (identifier: string | undefined, opts: { all: boolean; force: boolean; purge: boolean }) => {
       if (!identifier && !opts.all) {
-        console.log('Usage: reeve task clean <identifier> | --all [--force] [--purge]')
+        console.log('Usage: goblin task clean <identifier> | --all [--force] [--purge]')
         console.log('  --all    Clean all done/failed tasks (add --force for active tasks too)')
         console.log('  --force  Include active/queued tasks (requires --all)')
         console.log('  --purge  Full deletion (worktree + logs + state). Default preserves logs')
@@ -177,12 +177,12 @@ export function registerTaskCommands(cli: CAC): void {
       const { WorkspaceManager } = await import('../../workspace/manager')
       const { RepoStore } = await import('../../workspace/repo-store')
       const { StateStore } = await import('../../kernel/state')
-      const { REEVE_DIR } = await import('../../paths')
+      const { GOBLIN_DIR } = await import('../../paths')
       const { loadConfig } = await import('../../config')
 
       const workspace = new WorkspaceManager()
       const repoStore = new RepoStore(loadConfig().workspace.root)
-      const store = new StateStore(resolve(REEVE_DIR, 'state.json'))
+      const store = new StateStore(resolve(GOBLIN_DIR, 'state.json'))
       const loaded = store.load()
       console.log(`[clean] Loaded ${loaded} tasks from state`)
 

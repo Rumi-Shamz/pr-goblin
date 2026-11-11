@@ -1,14 +1,14 @@
 import { writeFileSync } from "fs"
 import { resolve } from "path"
 
-import type { ReeveDaemonConfig } from "../config"
+import type { GoblinDaemonConfig } from "../config"
 import type { SandboxHandle } from "./backend"
 
 const LINEAR_ENDPOINT = "https://api.linear.app/graphql"
 
 export async function prepareClaudeSandbox(
   workDir: string,
-  config: ReeveDaemonConfig,
+  config: GoblinDaemonConfig,
 ): Promise<SandboxHandle> {
   const apiKey = config.linear?.apiKey
   if (!apiKey) return {}
@@ -19,7 +19,7 @@ export async function prepareClaudeSandbox(
     JSON.stringify(
       {
         mcpServers: {
-          "reeve-linear": {
+          "goblin-linear": {
             command: "npx",
             args: ["-y", "mcp-graphql"],
             env: {

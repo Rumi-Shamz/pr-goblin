@@ -1,8 +1,8 @@
-/* bugpilot widget — CSS custom property theming layer.
+/* pr-goblin widget — CSS custom property theming layer.
    Host app overrides any --bp-* variable it cares about.
 
    The default palette is deliberately grayscale: brand colour belongs to the
-   host app, supplied via BugPilot.init({ color }) or by overriding --bp-primary
+   host app, supplied via PrGoblin.init({ color }) or by overriding --bp-primary
    and friends. Error/success stay semantic (state feedback, not branding) and
    are equally overridable. */
 
