@@ -7,6 +7,7 @@ import { tmpdir } from "os"
 
 import type { GoblinDaemonConfig } from "../config"
 import { DEFAULT_POLICY } from "./policy"
+import { StateStore } from "./state"
 import type { Source, SourceDisposition } from "./source"
 import type { KernelConfig, SourceItem, Task } from "./types"
 
@@ -57,6 +58,7 @@ interface Harness {
 }
 
 let counter = 0
+let stateRoot = tmpdir()
 
 async function harness(config: GoblinDaemonConfig, hour = 12): Promise<Harness> {
   let polled: SourceItem[] = []
@@ -76,6 +78,8 @@ async function harness(config: GoblinDaemonConfig, hour = 12): Promise<Harness> 
 
   const { Kernel } = await import(`./kernel?policy-test=${++counter}`)
   const kernel: any = new Kernel(source, config, KERNEL_CONFIG)
+  // paths.ts freezes GOBLIN_DIR at first import, so give each kernel its own state file.
+  kernel.store = new StateStore(join(stateRoot, `state-${counter}.json`))
   kernel.now = () => new Date(2026, 10, 12, hour, 0)
   kernel.workspace = {
     async fetchLatest(): Promise<void> {},
@@ -110,6 +114,7 @@ describe("Kernel policy", () => {
 
   beforeAll(() => {
     goblinDir = mkdtempSync(join(tmpdir(), "goblin-kernel-policy-"))
+    stateRoot = goblinDir
     process.env.GOBLIN_DIR = goblinDir
   })
 
@@ -234,6 +239,21 @@ describe("Kernel policy", () => {
       batchWaiting: 1,
       timedOut: false,
     })
+  })
+
+  test("runOnce reports only what this run changed, not tasks left from earlier runs", async () => {
+    const h = await harness(createConfig())
+    h.kernel.store.set({
+      id: "old", identifier: "OLD", title: "", description: "", labels: [], priority: null,
+      state: "published", repo: "acme/app", baseBranch: "main", round: 0, maxRounds: 2, retryCount: 0,
+      createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
+    } satisfies Task)
+    h.kernel.store.save()
+    h.setDisposition("passive")
+
+    const summary = await h.kernel.runOnce({ pollMs: 10, deadlineMs: 5000 })
+
+    expect(summary.worked).toEqual([])
   })
 
   test("runOnce returns immediately when there is nothing to do", async () => {

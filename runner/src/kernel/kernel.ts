@@ -258,7 +258,10 @@ export class Kernel {
     await this.recover();
     await this.cleanOrphans();
 
-    const before = new Set(this.store.all().filter((t) => t.state === 'done').map((t) => t.id));
+    // Snapshot so the summary reports only what this run changed, not tasks
+    // left over from an earlier run on a machine that keeps its state.
+    const signature = (t: Task): string => `${t.state}|${t.doneReason ?? ''}|${t.mode ?? ''}|${t.round}|${t.retryCount}`;
+    const before = new Map(this.store.all().map((t) => [t.id, signature(t)]));
     await this.intake();
 
     let timedOut = false;
@@ -283,7 +286,7 @@ export class Kernel {
 
     const worked = this.store
       .all()
-      .filter((t) => !before.has(t.id))
+      .filter((t) => before.get(t.id) !== signature(t))
       .map((t) => ({
         identifier: t.identifier,
         outcome:

@@ -96,6 +96,7 @@ async function loadStartCli(opts: { ready: boolean }) {
       projects: [],
     }),
     loadSettings: () => ({}),
+    settingsFromEnv: () => ({}),
     getSettingsPath: () => join(goblinDir, "settings.json"),
   }))
 
@@ -274,7 +275,10 @@ describe("cmdStart", () => {
     })
 
     try {
-      await cli.parse(["bun", "/usr/local/bin/goblin", "start"])
+      // cac's parse() does not await an async action; run it explicitly so the
+      // assertions below cannot race the command.
+      cli.parse(["bun", "/usr/local/bin/goblin", "start"], { run: false })
+      await cli.runMatchedCommand()
 
       const spawnArgs = spawn.mock.calls[0]?.[0] as string[] | undefined
       expect(spawnArgs).toBeDefined()
