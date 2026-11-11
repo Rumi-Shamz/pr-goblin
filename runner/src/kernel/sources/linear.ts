@@ -6,17 +6,25 @@ import type { SourceDisposition } from "../source"
 import type { SourceItem } from "../types"
 import { LinearClient } from "../../linear/client"
 import type { LinearConfig, ProjectConfig } from "../../config"
-import { spawnPath } from "../../utils/path"
+import { detectPrUrlInWorktree } from "./pr"
 
 export class LinearSource implements Source {
+  readonly tracker = "linear" as const
   private client: LinearClient
   private projects: ProjectConfig[]
   private stateNames: LinearConfig["stateNames"]
 
-  constructor(linearConfig: LinearConfig, projects: ProjectConfig[]) {
+  private investigatedLabel: string
+
+  constructor(linearConfig: LinearConfig, projects: ProjectConfig[], investigatedLabel = "goblin:investigated") {
     this.client = new LinearClient(linearConfig)
     this.projects = projects
     this.stateNames = linearConfig.stateNames
+    this.investigatedLabel = investigatedLabel
+  }
+
+  async onInvestigated(item: SourceItem): Promise<void> {
+    await this.client.addLabel(item.id, this.investigatedLabel)
   }
 
   private classifyDisposition(stateName: string): SourceDisposition {
@@ -87,26 +95,7 @@ export class LinearSource implements Source {
     return this.classifyDisposition(snapshot.state)
   }
 
-  async detectPrUrl(codeDir: string): Promise<string | undefined> {
-    try {
-      const proc = Bun.spawn(
-        ['gh', 'pr', 'view', '--json', 'url', '--jq', '.url'],
-        {
-          cwd: codeDir,
-          stdout: 'pipe',
-          stderr: 'pipe',
-          env: {
-            ...process.env,
-            PATH: spawnPath(),
-          },
-        },
-      )
-      const exitCode = await proc.exited
-      if (exitCode !== 0) return undefined
-      const trimmed = (await new Response(proc.stdout).text()).trim()
-      return trimmed || undefined
-    } catch {
-      return undefined
-    }
+  detectPrUrl(codeDir: string): Promise<string | undefined> {
+    return detectPrUrlInWorktree(codeDir)
   }
 }

@@ -62,6 +62,8 @@ export interface Task {
   priority: number | null
   state: TaskState
   stage?: "implement" | "post-agent"
+  /** What the agent may do. "investigate" is read-only: no commits, no PR. Defaults to "implement". */
+  mode?: "implement" | "investigate"
   doneReason?: DoneReason
 
   // Repo context

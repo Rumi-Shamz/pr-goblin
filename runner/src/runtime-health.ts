@@ -146,7 +146,8 @@ export function getSetupEntryHealth(
   const agents = probeAgents(execSync)
 
   const issues: string[] = []
-  if (!hasApiKey) issues.push("No Linear API key configured")
+  const needsLinear = (settings.source ?? "linear") === "linear"
+  if (needsLinear && !hasApiKey) issues.push("No Linear API key configured")
   if (projectCount === 0) issues.push("No projects configured")
   if (!hasAnyAgent(agents)) issues.push(`No coding agent installed (need one of: ${AGENT_CLIS.join(", ")})`)
 

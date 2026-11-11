@@ -35,6 +35,7 @@ import { writeJsonFileAtomic } from '../persistence';
 import { syncHistoryIndexForTask } from '../history-index';
 import { captureTrace } from './trace';
 import { checkForUpdate, isUpdateCheckDisabled } from '../update-check';
+import { admit, DEFAULT_POLICY, type PolicyConfig } from './policy';
 
 type SSEListener = (event: {
   type: string;
@@ -115,6 +116,11 @@ export class Kernel {
   private _tickInProgress = false;
   private _tickCount = 0;
   lastTickAt = 0;
+  private policy: PolicyConfig;
+  /** Counts from the last poll, for status output. */
+  lastAdmission = { held: 0, batchWaiting: 0 };
+  /** Clock, overridable in tests. */
+  now: () => Date = () => new Date();
 
   // Exposed for server.ts webhook parsing
   readonly source: Source;
@@ -129,6 +135,7 @@ export class Kernel {
   ) {
     this.source = source;
     this.config = config;
+    this.policy = config.policy ?? DEFAULT_POLICY;
     this.store = new StateStore(resolve(GOBLIN_DIR, 'state.json'));
     this.log = new SessionLogger(resolve(LOGS_DIR, 'session.jsonl'));
     this.workspace = new WorkspaceManager();
@@ -231,6 +238,66 @@ export class Kernel {
   }
 
   /**
+   * One-shot mode for CI: poll once, work everything that is admitted until no
+   * agent is running and nothing dispatchable is queued, then return.
+   *
+   * Nothing is assumed to survive between runs: progress lives on the ticket
+   * (state + workpad comment) and in the pushed branch, so a later run on a
+   * clean machine picks up where this one stopped.
+   */
+  async runOnce(opts: { deadlineMs?: number; pollMs?: number } = {}): Promise<{
+    worked: { identifier: string; outcome: string; prUrl?: string }[];
+    held: number;
+    batchWaiting: number;
+    timedOut: boolean;
+  }> {
+    const deadline = Date.now() + (opts.deadlineMs ?? this.kernelConfig.turnTimeoutMs);
+    const pollMs = opts.pollMs ?? 2000;
+    this.running = true;
+    this.store.load();
+    await this.recover();
+    await this.cleanOrphans();
+
+    const before = new Set(this.store.all().filter((t) => t.state === 'done').map((t) => t.id));
+    await this.intake();
+
+    let timedOut = false;
+    for (;;) {
+      await this.dispatch();
+      this.checkStale();
+
+      const busy = this.handles.size > 0 || this.store.byState('active').length > 0;
+      const queued = this.store.byState('queued');
+      if (!busy && queued.length === 0) break;
+      if (!busy && queued.every((t) => t.retryAfter && new Date(t.retryAfter).getTime() > deadline)) break;
+      if (Date.now() > deadline) {
+        timedOut = true;
+        break;
+      }
+      await new Promise((r) => setTimeout(r, pollMs));
+    }
+
+    if (timedOut) await this.shutdown();
+    this.running = false;
+    this.store.save();
+
+    const worked = this.store
+      .all()
+      .filter((t) => !before.has(t.id))
+      .map((t) => ({
+        identifier: t.identifier,
+        outcome:
+          t.state === 'done'
+            ? t.mode === 'investigate' && t.doneReason === 'closed'
+              ? 'investigated'
+              : (t.doneReason ?? 'done')
+            : t.state,
+        prUrl: t.prUrl,
+      }));
+    return { worked, ...this.lastAdmission, timedOut };
+  }
+
+  /**
    * Graceful shutdown: kill all agents, wait for them to exit, persist state.
    * Agents that don't exit within the timeout keep their current state — recover() handles them on next start.
    */
@@ -310,11 +377,36 @@ export class Kernel {
   private async intake(): Promise<void> {
     // git fetch runs on a separate background timer (startFetchLoop),
     // so intake only polls the source — no blocking subprocess calls.
-    const items = await this.source.poll();
+    const polled = await this.source.poll();
 
-    for (const item of items) {
+    // Policy: which tickets may be worked right now, and in what mode.
+    const { admitted, held, batchWaiting } = admit(polled, this.now(), this.policy);
+    this.lastAdmission = { held: held.length, batchWaiting: batchWaiting.length };
+
+    for (const { item, decision } of admitted) {
       const existing = this.store.get(item.id);
       if (existing) {
+        if (
+          existing.state === 'done' &&
+          existing.mode === 'investigate' &&
+          decision.mode === 'implement'
+        ) {
+          // A human triaged an investigated report (removed the untrusted label) — now implement it.
+          existing.state = 'queued';
+          existing.mode = 'implement';
+          existing.doneReason = undefined;
+          existing.labels = item.labels;
+          existing.priority = item.priority;
+          existing.description = item.description;
+          existing.worktree = undefined;
+          existing.branch = undefined;
+          existing.round = 0;
+          existing.retryCount = 0;
+          existing.updatedAt = new Date().toISOString();
+          this.store.save();
+          this.log.event(existing.id, existing.identifier, 'promote_investigated', {});
+          continue;
+        }
         if (existing.state === 'done' && existing.doneReason === 'failed') {
           // Failed task reappeared in poll (human moved Backlog → Todo) — start fresh.
           existing.state = 'queued';
@@ -338,6 +430,7 @@ export class Kernel {
         labels: item.labels,
         priority: item.priority,
         state: 'queued',
+        mode: decision.mode,
         repo: item.repo,
         baseBranch: item.baseBranch,
         round: 0,
@@ -348,7 +441,11 @@ export class Kernel {
       };
       this.store.set(task);
       this.store.save();
-      this.log.event(task.id, task.identifier, 'intake', { title: task.title });
+      this.log.event(task.id, task.identifier, 'intake', {
+        title: task.title,
+        lane: decision.lane,
+        mode: decision.mode,
+      });
       this.emit({ type: 'task_added', task });
     }
   }
@@ -393,7 +490,11 @@ export class Kernel {
       .filter((t) => !t.retryAfter || new Date(t.retryAfter).getTime() <= now)
       .sort((a, b) => (a.priority ?? Infinity) - (b.priority ?? Infinity));
 
+    const limit = this.config.maxConcurrent ?? 0;
+
     for (const task of queued) {
+      // Concurrency cap: leave the rest queued for a later tick.
+      if (limit > 0 && this.store.byState('active').length >= limit) break;
       try {
         this.log.event(task.id, task.identifier, 'dispatch_start');
 
@@ -404,6 +505,8 @@ export class Kernel {
           task.identifier,
           repoDir,
           task.baseBranch,
+          false,
+          { tracker: this.source.tracker ?? 'linear', mode: task.mode ?? 'implement' },
         );
         task.taskDir = info.taskDir;
         task.workDir = info.workDir;
@@ -501,6 +604,22 @@ export class Kernel {
       enrichMeta(task, result, reason);
       syncHistoryIndexForTask(sanitizeTaskIdentifier(task.identifier));
       return this.retryOrFail(task, reason);
+    }
+
+    // Read-only investigation: no PR and no post-agents are expected. Record it
+    // on the ticket so it is not investigated again, then finish.
+    if (task.mode === 'investigate') {
+      enrichMeta(task, result, 'investigated');
+      syncHistoryIndexForTask(sanitizeTaskIdentifier(task.identifier));
+      try {
+        await this.source.onInvestigated?.(this.toSourceItem(task));
+      } catch (err) {
+        console.warn(
+          `[kernel] could not mark ${task.identifier} as investigated: ${err instanceof Error ? err.message : String(err)}`,
+        );
+      }
+      this.log.event(taskId, task.identifier, 'investigation_done', {});
+      return this.transition(task, 'done', 'closed');
     }
 
     if (task.worktree) {

@@ -38,6 +38,7 @@ function runGit(args: string[], cwd: string): void {
 // ── Mock source ──────────────────────────────────────────────
 
 const mockSource: Source = {
+  tracker: "linear",
   poll: async () => [],
   onStart: async () => {},
   onDone: async () => {},

@@ -25,7 +25,12 @@ export type SourceDisposition =
  * A Source polls an external tracker for work items and receives lifecycle callbacks.
  * Linear is the default implementation; the interface supports any tracker.
  */
+export type TrackerKind = "linear" | "github"
+
 export interface Source {
+  /** Which tracker this source talks to. Selects the agent's workflow rules and skill. Defaults to "linear". */
+  readonly tracker?: TrackerKind
+
   /** Poll for new candidate items ready for dispatch. */
   poll(): Promise<SourceItem[]>
 
@@ -37,6 +42,12 @@ export interface Source {
 
   /** Return the semantic disposition of an item. */
   fetchDisposition(itemId: string): Promise<SourceDisposition>
+
+  /**
+   * Record on the ticket that a read-only investigation has finished, in a way
+   * poll() will report back (a label), so the ticket is not investigated again.
+   */
+  onInvestigated?(item: SourceItem): Promise<void>
 
   /** Detect PR URL from a worktree. Optional — only sources with VCS integration implement this. */
   detectPrUrl?(worktreeDir: string): Promise<string | undefined>

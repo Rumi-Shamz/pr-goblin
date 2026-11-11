@@ -126,6 +126,34 @@ export class LinearClient {
   async addComment(issueId: string, body: string): Promise<void> {
     await this.query(ADD_ISSUE_COMMENT, { issueId, body })
   }
+
+  /**
+   * Add a label to an issue by name, creating the team label if it is missing.
+   */
+  async addLabel(issueId: string, labelName: string): Promise<void> {
+    const team = await this.resolveIssueTeam(issueId)
+    if (!team) return
+
+    const found = await this.query<{ issueLabels: { nodes: { id: string }[] } }>(
+      `query ($name: String!) { issueLabels(filter: { name: { eq: $name } }) { nodes { id } } }`,
+      { name: labelName },
+    )
+    let labelId = found.issueLabels.nodes[0]?.id
+    if (!labelId) {
+      const created = await this.query<{ issueLabelCreate: { issueLabel: { id: string } } }>(
+        `mutation ($name: String!, $teamId: String!) {
+          issueLabelCreate(input: { name: $name, teamId: $teamId }) { issueLabel { id } }
+        }`,
+        { name: labelName, teamId: team.teamId },
+      )
+      labelId = created.issueLabelCreate.issueLabel.id
+    }
+    await this.query(
+      `mutation ($id: String!, $labelId: String!) { issueAddLabel(id: $id, labelId: $labelId) { success } }`,
+      { id: issueId, labelId },
+    )
+  }
+
   /**
    * Resolve a state name to its Linear ID (cached)
    */

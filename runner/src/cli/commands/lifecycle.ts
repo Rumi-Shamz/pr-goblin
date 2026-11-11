@@ -3,7 +3,7 @@
 import type { CAC } from 'cac'
 import { resolve, dirname } from 'path'
 import { existsSync, readFileSync, openSync } from 'fs'
-import { loadConfig, getSettingsPath, loadSettings } from '../../config'
+import { loadConfig, getSettingsPath, loadSettings, settingsFromEnv } from '../../config'
 import { getRuntimeHealth } from '../../runtime-health'
 import { printAnimatedBanner } from '../../kernel/banner'
 import { serveDashboard, installGracefulShutdown } from './runtime'
@@ -29,7 +29,7 @@ const GOBLIN_ROOT = resolve(dirname(new URL(import.meta.url).pathname), '../../.
 // ── Kernel bootstrap ─────────────────────────────────────
 
 function preflight(): { ready: boolean; issues: string[] } {
-  const health = getRuntimeHealth(loadSettings())
+  const health = getRuntimeHealth({ ...loadSettings(), ...settingsFromEnv() })
   return { ready: health.runtimeReady, issues: health.issues }
 }
 
@@ -57,7 +57,16 @@ async function createRuntimeKernel(config: ReturnType<typeof loadConfig>) {
     case 'linear': {
       if (!config.linear) throw new Error('Linear config is required when source is "linear"')
       const { LinearSource } = await import('../../kernel/sources/linear')
-      source = new LinearSource(config.linear, config.projects)
+      source = new LinearSource(config.linear, config.projects, config.policy?.investigatedLabel)
+      break
+    }
+    case 'github': {
+      if (!config.github) throw new Error('GitHub config is required when source is "github"')
+      const { GitHubSource } = await import('../../kernel/sources/github')
+      source = new GitHubSource(config.projects, {
+        ...config.github,
+        investigatedLabel: config.policy?.investigatedLabel ?? config.github.investigatedLabel,
+      })
       break
     }
     default:
@@ -335,6 +344,47 @@ async function cmdRestart(): Promise<void> {
   await cmdStart()
 }
 
+/**
+ * `goblin once` — poll once, work what is admitted, exit. Built for CI:
+ * no daemon, no dashboard, no state assumed from a previous run.
+ * Exit code: 0 when every worked ticket ended well, 1 when one failed or the run timed out.
+ */
+async function cmdOnce(opts: { timeout?: string; json?: boolean }): Promise<void> {
+  const { suppressUpdateNotification } = await import('../context')
+  suppressUpdateNotification()
+
+  const config = loadConfig()
+  const { ready, issues } = preflight()
+  if (!ready) {
+    console.error(buildRunNotReadyMessage(issues))
+    process.exit(1)
+  }
+
+  const minutes = Number(opts.timeout)
+  const deadlineMs = Number.isFinite(minutes) && minutes > 0 ? minutes * 60_000 : undefined
+
+  const runtime = await createRuntimeKernel({
+    ...config,
+    dashboard: { ...config.dashboard, enabled: false },
+  })
+  const summary = await runtime.kernel.runOnce({ deadlineMs })
+
+  if (opts.json) {
+    console.log(JSON.stringify(summary, null, 2))
+  } else {
+    if (summary.worked.length === 0) console.log('goblin: nothing to work on')
+    for (const w of summary.worked) {
+      console.log(`goblin: ${w.identifier} → ${w.outcome}${w.prUrl ? ` ${w.prUrl}` : ''}`)
+    }
+    if (summary.held > 0) console.log(`goblin: ${summary.held} untrusted ticket(s) waiting for human triage`)
+    if (summary.batchWaiting > 0) console.log(`goblin: ${summary.batchWaiting} batch ticket(s) waiting for the batch window`)
+    if (summary.timedOut) console.error('goblin: timed out before all agents finished')
+  }
+
+  const failed = summary.timedOut || summary.worked.some((w) => w.outcome === 'failed')
+  process.exit(failed ? 1 : 0)
+}
+
 // ── Registration ─────────────────────────────────────────
 
 export function registerLifecycleCommands(cli: CAC): void {
@@ -352,6 +402,14 @@ export function registerLifecycleCommands(cli: CAC): void {
     .command('run', 'Start in foreground (Ctrl+C to stop)')
     .action(async () => {
       await cmdRun()
+    })
+
+  cli
+    .command('once', 'Poll once, work admitted tickets, then exit (for CI)')
+    .option('--timeout <minutes>', 'Give up after this many minutes')
+    .option('--json', 'Print the run summary as JSON')
+    .action(async (opts: { timeout?: string; json?: boolean }) => {
+      await cmdOnce(opts)
     })
 
   // Internal: spawned by `goblin start`. The "Internal:" prefix signals users

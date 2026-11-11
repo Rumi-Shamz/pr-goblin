@@ -43,7 +43,7 @@ Fixes ISSUE-ID
 - **Status:** success | partial
 
 ---
-*Automated by [Goblin](https://github.com/ianchenx/reeve)*
+*Automated by pr-goblin*
 EOF
 
 gh pr create --title "ISSUE-ID: <concise title>" --body-file /tmp/pr-body.md

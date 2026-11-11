@@ -37,6 +37,7 @@ const taskSchema = z.object({
   priority: z.number().nullable(),
   state: z.enum(["queued", "active", "published", "done"]),
   stage: z.enum(["implement", "post-agent"]).optional(),
+  mode: z.enum(["implement", "investigate"]).optional(),
   doneReason: z.enum(["merged", "closed", "failed"]).optional(),
   repo: z.string(),
   baseBranch: z.string(),

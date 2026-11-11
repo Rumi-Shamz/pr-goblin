@@ -10,6 +10,8 @@ export async function prepareClaudeSandbox(
   workDir: string,
   config: GoblinDaemonConfig,
 ): Promise<SandboxHandle> {
+  // GitHub source: the agent uses the gh CLI, no MCP server needed.
+  if (config.source !== "linear") return {}
   const apiKey = config.linear?.apiKey
   if (!apiKey) return {}
 

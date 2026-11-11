@@ -12,7 +12,7 @@
 import { appendFileSync, existsSync, lstatSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, symlinkSync, unlinkSync } from "fs"
 import { basename, resolve, sep } from "path"
 import { sanitizeTaskIdentifier, TASKS_DIR } from "../paths"
-import { setupAgentContext, buildAgentRules } from "./context-injector"
+import { setupAgentContext, buildAgentRules, skillsFor, type RulesOptions } from "./context-injector"
 import { trySpawnSync } from "../utils/spawn"
 
 
@@ -70,7 +70,7 @@ export class WorkspaceManager {
    * return it as-is (preserves partial work from prior dispatch).
    * Otherwise, always creates fresh — removes stale worktree/branch if they exist.
    */
-  async createForTask(identifier: string, repoDir: string, baseBranch = "main", reuse = false): Promise<WorkspaceInfo> {
+  async createForTask(identifier: string, repoDir: string, baseBranch = "main", reuse = false, rules: RulesOptions = {}): Promise<WorkspaceInfo> {
     const sanitized = sanitizeTaskIdentifier(identifier)
     const branch = `agent/${sanitized}`
     const repoName = basename(repoDir)
@@ -83,7 +83,7 @@ export class WorkspaceManager {
       // Clean slate for retry/continuation
       await this.execInOrThrow(worktreeDir, ["git", "reset", "--hard"])
       await this.execInOrThrow(worktreeDir, ["git", "clean", "-fd"])
-      setupAgentContext(implementDir, buildAgentRules(repoName))
+      setupAgentContext(implementDir, buildAgentRules(repoName, rules), skillsFor(rules))
       const repoLink = resolve(implementDir, repoName)
       try { lstatSync(repoLink) } catch { symlinkSync(worktreeDir, repoLink) }
       return {
@@ -122,7 +122,7 @@ export class WorkspaceManager {
     this.writeWorktreeExclude(worktreeDir)
 
     // Create implement agent dir with context + symlink
-    setupAgentContext(implementDir, buildAgentRules(repoName))
+    setupAgentContext(implementDir, buildAgentRules(repoName, rules), skillsFor(rules))
     const repoLink = resolve(implementDir, repoName)
     try { lstatSync(repoLink) } catch { symlinkSync(worktreeDir, repoLink) }
 
