@@ -1,0 +1,21 @@
+packages:
+  - "."
+
+allowBuilds:
+  # All three are wrangler/miniflare's own toolchain (native binaries for the
+  # bundler, the Workers runtime, and image processing) - required for
+  # `wrangler dev`/`deploy` to run at all, not optional transitive deps.
+  esbuild: true
+  sharp: true
+  workerd: true
+
+overrides:
+  # 2026-09-20: sharp is pulled in transitively via wrangler>miniflare and
+  # resolved to 0.35.2, vulnerable to GHSA-g89c-p67h-r497 / GHSA-2jg2-4ch7-h545
+  # (libheif). Patched in 0.35.4. sharp is not a direct dependency of this
+  # worker; the override forces the transitive resolution only.
+  sharp: ">=0.35.5"
+  # 2026-10-24: wrangler>miniflare pins undici 7.29.0 (fixed 7.29.1) and vite's postcss
+  # pulls source-map-js 1.2.1 (event-loop DoS, fixed 1.2.2).
+  "undici@<7.29.1": ^7.29.1
+  source-map-js: ">=1.2.2"

@@ -1,0 +1,39 @@
+name = "bugpilot-worker"
+main = "src/index.ts"
+compatibility_date = "2024-12-18"
+compatibility_flags = ["nodejs_compat"]
+
+# Required secrets (set via: wrangler secret put GITHUB_TOKEN)
+# GITHUB_TOKEN      — classic PAT with repo scope (issues + contents + actions write)
+# GITHUB_REPO       — "owner/repo"
+# WEBHOOK_SECRET    — shared secret for /webhook/apply-fix (generate with: openssl rand -hex 16)
+
+[vars]
+# ALLOWED_ORIGIN controls the Access-Control-Allow-Origin response header.
+# "*" is the open default — anyone can POST from any origin (fine for local dev,
+# but before deploying to production change this to your actual domain so that
+# browser-based submissions are restricted to your site:
+#   ALLOWED_ORIGIN = "https://yourapp.com"
+# Note: CORS headers only affect browser requests. Server-side or curl requests
+# bypass CORS regardless, so this is not a substitute for rate limiting.
+ALLOWED_ORIGIN = "*"
+
+# Business Review 360 deployment
+# Deploy: wrangler deploy --env br360
+# Secrets: wrangler secret put GITHUB_TOKEN --env br360
+#          wrangler secret put GITHUB_REPO --env br360
+#          wrangler secret put WEBHOOK_SECRET --env br360
+[env.br360]
+name = "bugpilot-br360"
+[env.br360.vars]
+ALLOWED_ORIGIN = "https://www.businessreview360.au,https://demo-corp.businessreview360.au"
+
+# Groundwork deployment
+# Deploy: wrangler deploy --env groundwork
+# Secrets: wrangler secret put GITHUB_TOKEN --env groundwork
+#          wrangler secret put GITHUB_REPO --env groundwork
+#          wrangler secret put WEBHOOK_SECRET --env groundwork
+[env.groundwork]
+name = "bugpilot-groundwork"
+[env.groundwork.vars]
+ALLOWED_ORIGIN = "https://groundwork.lunt.au"

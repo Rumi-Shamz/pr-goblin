@@ -1,0 +1,473 @@
+/* bugpilot widget — CSS custom property theming layer.
+   Host app overrides any --bp-* variable it cares about.
+
+   The default palette is deliberately grayscale: brand colour belongs to the
+   host app, supplied via BugPilot.init({ color }) or by overriding --bp-primary
+   and friends. Error/success stay semantic (state feedback, not branding) and
+   are equally overridable. */
+
+:root {
+  --bp-primary: #262626;
+  --bp-primary-hover: #404040;
+  --bp-primary-soft: rgba(0, 0, 0, 0.05);
+  --bp-surface: #ffffff;
+  --bp-surface-raised: #fafafa;
+  --bp-border: #e5e5e5;
+  --bp-text: #171717;
+  --bp-text-muted: #737373;
+  --bp-error: #ef4444;
+  --bp-required: #dc2626;
+  --bp-success: #22c55e;
+  --bp-on-primary: #ffffff;
+  --bp-error-soft: rgba(239, 68, 68, 0.08);
+  --bp-success-soft: rgba(34, 197, 94, 0.08);
+  --bp-backdrop: rgba(0, 0, 0, 0.4);
+  --bp-radius: 12px;
+  --bp-radius-sm: 6px;
+  --bp-radius-xs: 4px;
+  --bp-border-width: 1px;
+  --bp-shadow: 0 10px 40px rgba(0, 0, 0, 0.15);
+  --bp-trigger-radius: 999px;
+  --bp-trigger-border-color: transparent;
+  --bp-trigger-shadow: 0 2px 10px var(--bp-primary-shadow, rgba(0, 0, 0, 0.16));
+  --bp-tab-size: 36px;
+  --bp-tab-hit: 44px;
+  --bp-tab-peek: 0px;
+  --bp-tab-radius: 0;
+  --bp-z-index: 2147483647;
+  --bp-font: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+/* Trigger button */
+.bp-trigger {
+  position: fixed;
+  z-index: var(--bp-z-index);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  background: var(--bp-primary);
+  color: var(--bp-on-primary);
+  border: var(--bp-border-width) solid var(--bp-trigger-border-color);
+  border-radius: var(--bp-trigger-radius);
+  font-family: var(--bp-font);
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  box-shadow: var(--bp-trigger-shadow);
+  transition: background 0.15s, transform 0.1s;
+  user-select: none;
+  box-sizing: border-box;
+}
+
+.bp-trigger:hover {
+  background: var(--bp-primary-hover);
+}
+
+.bp-trigger:active {
+  transform: scale(0.97);
+}
+
+.bp-trigger--bottom-right { bottom: 24px; right: 24px; }
+.bp-trigger--bottom-left  { bottom: 24px; left: 24px; }
+.bp-trigger--top-right    { top: 24px; right: 24px; }
+.bp-trigger--top-left     { top: 24px; left: 24px; }
+
+.bp-trigger svg {
+  flex-shrink: 0;
+}
+
+.bp-trigger-icon {
+  display: inline-flex;
+  align-items: center;
+}
+
+/* Tab variant: icon-only square docked flush against a viewport edge.
+   The button is the 44px hit area (WCAG 2.5.8); the face is the visible
+   36px square, fully visible by default so the icon sits centred in it.
+   A host can set --bp-tab-peek to tuck the face under the edge at rest
+   (drawer-handle feel); hover, focus and drag always slide it fully out. */
+.bp-trigger--tab {
+  width: var(--bp-tab-hit);
+  height: var(--bp-tab-hit);
+  padding: 0;
+  background: none;
+  border: none;
+  border-radius: 0;
+  box-shadow: none;
+  justify-content: center;
+  touch-action: none;
+  transition: transform 0.2s;
+}
+
+.bp-trigger--tab:active {
+  transform: none;
+}
+
+.bp-trigger--tab.bp-trigger--right { right: 0; }
+.bp-trigger--tab.bp-trigger--left  { left: 0; }
+
+.bp-tab-face {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--bp-tab-size);
+  height: var(--bp-tab-size);
+  box-sizing: border-box;
+  background: var(--bp-primary);
+  color: var(--bp-on-primary);
+  border: var(--bp-border-width) solid var(--bp-trigger-border-color);
+  box-shadow: var(--bp-trigger-shadow);
+  transition: transform 0.15s, background 0.15s;
+}
+
+.bp-tab-face svg {
+  width: 20px;
+  height: 20px;
+}
+
+/* (hit - size) / 2 is the gap between the centred face and the button edge;
+   adding the peek tucks the face under the viewport edge. */
+.bp-trigger--right .bp-tab-face {
+  border-radius: var(--bp-tab-radius) 0 0 var(--bp-tab-radius);
+  border-right-width: 0;
+  transform: translateX(calc((var(--bp-tab-hit) - var(--bp-tab-size)) / 2 + var(--bp-tab-peek)));
+}
+
+.bp-trigger--left .bp-tab-face {
+  border-radius: 0 var(--bp-tab-radius) var(--bp-tab-radius) 0;
+  border-left-width: 0;
+  transform: translateX(calc(-1 * ((var(--bp-tab-hit) - var(--bp-tab-size)) / 2 + var(--bp-tab-peek))));
+}
+
+.bp-trigger--right:hover .bp-tab-face,
+.bp-trigger--right:focus-visible .bp-tab-face,
+.bp-trigger--right.bp-trigger--dragging .bp-tab-face {
+  transform: translateX(calc((var(--bp-tab-hit) - var(--bp-tab-size)) / 2));
+}
+
+.bp-trigger--left:hover .bp-tab-face,
+.bp-trigger--left:focus-visible .bp-tab-face,
+.bp-trigger--left.bp-trigger--dragging .bp-tab-face {
+  transform: translateX(calc(-1 * ((var(--bp-tab-hit) - var(--bp-tab-size)) / 2)));
+}
+
+.bp-trigger--tab:hover .bp-tab-face {
+  background: var(--bp-primary-hover);
+}
+
+.bp-trigger--dragging {
+  transition: none;
+  cursor: grabbing;
+}
+
+.bp-trigger--dragging .bp-tab-face {
+  transition: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bp-trigger,
+  .bp-trigger--tab,
+  .bp-tab-face,
+  .bp-dialog,
+  .bp-backdrop {
+    transition: none;
+  }
+}
+
+/* Overlay backdrop */
+.bp-backdrop {
+  position: fixed;
+  inset: 0;
+  background: var(--bp-backdrop);
+  z-index: var(--bp-z-index);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s;
+}
+
+.bp-backdrop.bp-visible {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+/* Dialog panel */
+.bp-dialog {
+  position: fixed;
+  z-index: var(--bp-z-index);
+  bottom: 84px;
+  right: 24px;
+  width: 380px;
+  max-width: calc(100vw - 32px);
+  max-height: calc(100vh - 120px);
+  background: var(--bp-surface);
+  border: var(--bp-border-width) solid var(--bp-border);
+  border-radius: var(--bp-radius);
+  box-shadow: var(--bp-shadow);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  opacity: 0;
+  transform: translateY(8px) scale(0.98);
+  transition: opacity 0.2s, transform 0.2s;
+  pointer-events: none;
+}
+
+.bp-dialog.bp-visible {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+  pointer-events: all;
+}
+
+.bp-dialog--bottom-left  { right: auto; left: 24px; }
+.bp-dialog--top-right    { bottom: auto; top: 84px; }
+.bp-dialog--top-left     { bottom: auto; top: 84px; right: auto; left: 24px; }
+.bp-dialog--tab.bp-dialog--right { bottom: 24px; right: 24px; }
+.bp-dialog--tab.bp-dialog--left  { bottom: 24px; right: auto; left: 24px; }
+
+/* Dialog header */
+.bp-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--bp-border);
+  flex-shrink: 0;
+}
+
+.bp-header h2 {
+  margin: 0;
+  font-family: var(--bp-font);
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--bp-text);
+}
+
+.bp-close {
+  background: none;
+  border: none;
+  padding: 4px;
+  cursor: pointer;
+  color: var(--bp-text-muted);
+  border-radius: var(--bp-radius-sm);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.1s;
+}
+
+.bp-close:hover {
+  background: var(--bp-surface-raised);
+}
+
+/* Scrollable form body */
+.bp-body {
+  overflow-y: auto;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  flex: 1;
+}
+
+/* Form fields */
+.bp-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.bp-label {
+  font-family: var(--bp-font);
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--bp-text);
+}
+
+.bp-label span {
+  color: var(--bp-required);
+  font-weight: 500;
+}
+
+.bp-select,
+.bp-textarea {
+  font-family: var(--bp-font);
+  font-size: 14px;
+  color: var(--bp-text);
+  background: var(--bp-surface);
+  border: 1px solid var(--bp-border);
+  border-radius: var(--bp-radius-sm);
+  padding: 8px 12px;
+  outline: none;
+  transition: border-color 0.15s;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.bp-select:focus,
+.bp-textarea:focus {
+  border-color: var(--bp-primary);
+}
+
+.bp-textarea {
+  resize: vertical;
+  min-height: 90px;
+}
+
+/* Context chips */
+.bp-context {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.bp-chip {
+  font-family: var(--bp-font);
+  font-size: 11px;
+  color: var(--bp-text-muted);
+  background: var(--bp-surface-raised);
+  border: 1px solid var(--bp-border);
+  border-radius: var(--bp-radius-xs);
+  padding: 2px 8px;
+}
+
+/* Screenshot section */
+.bp-screenshot-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.bp-btn-ghost {
+  font-family: var(--bp-font);
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--bp-primary);
+  background: none;
+  border: 1px solid var(--bp-primary);
+  border-radius: var(--bp-radius-sm);
+  padding: 6px 12px;
+  cursor: pointer;
+  transition: background 0.15s;
+  white-space: nowrap;
+}
+
+.bp-btn-ghost:hover {
+  background: var(--bp-primary-soft);
+}
+
+.bp-btn-ghost:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.bp-screenshot-preview {
+  max-height: 120px;
+  max-width: 100%;
+  border-radius: var(--bp-radius-sm);
+  border: 1px solid var(--bp-border);
+  display: none;
+  margin-top: 8px;
+}
+
+.bp-screenshot-preview.bp-visible {
+  display: block;
+}
+
+/* Footer */
+.bp-footer {
+  padding: 14px 20px;
+  border-top: 1px solid var(--bp-border);
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+  flex-shrink: 0;
+}
+
+.bp-btn-primary {
+  font-family: var(--bp-font);
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--bp-on-primary);
+  background: var(--bp-primary);
+  border: none;
+  border-radius: var(--bp-radius-sm);
+  padding: 8px 18px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.bp-btn-primary:hover {
+  background: var(--bp-primary-hover);
+}
+
+.bp-btn-primary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Type picker */
+.bp-type-picker {
+  display: flex;
+  gap: 6px;
+}
+
+.bp-type-btn {
+  flex: 1;
+  font-family: var(--bp-font);
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--bp-text-muted);
+  background: var(--bp-surface-raised);
+  border: 1px solid var(--bp-border);
+  border-radius: var(--bp-radius-sm);
+  padding: 8px 12px;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+
+.bp-type-btn:hover {
+  color: var(--bp-text);
+  border-color: var(--bp-text-muted);
+}
+
+.bp-type-btn--active {
+  color: var(--bp-primary);
+  background: var(--bp-primary-soft);
+  border-color: var(--bp-primary);
+}
+
+/* Hidden field groups */
+.bp-fields--hidden {
+  display: none;
+}
+
+/* Two-column row for compact fields */
+.bp-field-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+/* Status messages */
+.bp-status {
+  font-family: var(--bp-font);
+  font-size: 13px;
+  padding: 8px 12px;
+  border-radius: var(--bp-radius-sm);
+  display: none;
+}
+
+.bp-status.bp-visible {
+  display: block;
+}
+
+.bp-status--error {
+  color: var(--bp-error);
+  background: var(--bp-error-soft);
+}
+
+.bp-status--success {
+  color: var(--bp-success);
+  background: var(--bp-success-soft);
+}

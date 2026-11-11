@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>bugpilot widget — test harness</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      margin: 0;
+      padding: 40px;
+      background: #f1f5f9;
+      color: #0f172a;
+    }
+    h1 { font-size: 24px; margin-bottom: 8px; }
+    p { color: #64748b; margin-bottom: 32px; }
+    .card {
+      background: #fff;
+      border-radius: 12px;
+      padding: 24px;
+      max-width: 480px;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+      margin-bottom: 20px;
+    }
+    label { display: block; font-size: 13px; font-weight: 500; margin-bottom: 6px; }
+    input {
+      width: 100%;
+      box-sizing: border-box;
+      padding: 8px 10px;
+      border: 1px solid #e2e8f0;
+      border-radius: 6px;
+      font-size: 14px;
+      margin-bottom: 14px;
+    }
+    button {
+      padding: 8px 16px;
+      background: #6366f1;
+      color: #fff;
+      border: none;
+      border-radius: 6px;
+      font-size: 14px;
+      cursor: pointer;
+    }
+    button:hover { background: #4f46e5; }
+    code { font-size: 12px; background: #f8fafc; padding: 2px 6px; border-radius: 4px; }
+
+    /* Editorial theme, kept in step with the README example */
+    html.editorial {
+      --bp-primary: #1c1b1a;
+      --bp-primary-hover: #3a3835;
+      --bp-primary-soft: rgba(28, 27, 26, 0.06);
+      --bp-on-primary: #ffffff;
+      --bp-required: #b3401d;
+      --bp-error: #b3401d;
+      --bp-error-soft: rgba(179, 64, 29, 0.08);
+      --bp-surface: #fff6e5;
+      --bp-surface-raised: #ffffff;
+      --bp-border: #1c1b1a;
+      --bp-border-width: 1px;
+      --bp-trigger-border-color: #1c1b1a;
+      --bp-text: #1c1b1a;
+      --bp-text-muted: #5e5a54;
+      --bp-radius: 0;
+      --bp-radius-sm: 0;
+      --bp-radius-xs: 0;
+      --bp-trigger-radius: 0;
+      --bp-tab-radius: 0;
+      --bp-shadow: none;
+      --bp-trigger-shadow: none;
+      --bp-font: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
+    }
+  </style>
+</head>
+<body>
+  <h1>bugpilot test harness</h1>
+  <p>The widget posts to the endpoint below. Use a local Worker dev server or a mock endpoint.</p>
+
+  <div class="card">
+    <label for="endpoint">Endpoint URL</label>
+    <input id="endpoint" type="url" value="http://localhost:8787/feedback" />
+    <label for="project">Project name</label>
+    <input id="project" type="text" value="Test Harness" />
+    <label for="variant">Variant</label>
+    <select id="variant"><option value="pill">pill (default)</option><option value="tab">tab</option></select>
+    <label for="side">Side (tab only)</label>
+    <select id="side"><option value="right">right (default)</option><option value="left">left</option></select>
+    <label for="editorial"><input id="editorial" type="checkbox" style="width:auto;margin:0 6px 0 0" />Editorial theme (README example)</label>
+    <button onclick="reinit()">Reinit widget with these settings</button>
+  </div>
+
+  <div class="card">
+    <p style="margin:0; font-size:13px; color:#64748b">
+      The feedback button appears at bottom-right.<br/>
+      You can also trigger it programmatically via <code>BugPilot.open()</code> in the browser console.
+    </p>
+  </div>
+
+  <script type="module">
+    import BugPilot from '../src/index.js'
+
+    window.BugPilot = BugPilot
+
+    function init() {
+      const endpoint = document.getElementById('endpoint').value
+      const projectName = document.getElementById('project').value
+      const variant = document.getElementById('variant').value
+      const side = document.getElementById('side').value
+      document.documentElement.classList.toggle('editorial', document.getElementById('editorial').checked)
+      BugPilot.init({
+        endpoint,
+        projectName,
+        position: 'bottom-right',
+        variant,
+        side,
+        labels: ['bug', 'test'],
+        user: { name: 'Test Reporter', login: 'harness' },
+      })
+    }
+
+    window.reinit = () => {
+      BugPilot.destroy()
+      // Remove DOM nodes left by previous instance
+      document.querySelectorAll('.bp-trigger, .bp-dialog, .bp-backdrop').forEach(el => el.remove())
+      init()
+    }
+
+    init()
+  </script>
+</body>
+</html>

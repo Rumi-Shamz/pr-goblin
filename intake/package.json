@@ -1,0 +1,23 @@
+{
+  "name": "bugpilot-worker",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "cf-typegen": "wrangler types",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^5.20260818.1",
+    "typescript": "^7.0.2",
+    "vite": "^8.3.5",
+    "vitest": "^4.1.12",
+    "wrangler": "^4.124.0"
+  },
+  "packageManager": "pnpm@11.1.2",
+  "dependencies": {
+    "zod": "^4.6.7"
+  }
+}
