@@ -4,6 +4,7 @@ import cssText from './styles.css?inline'
 import { resolveIcon } from './icon.js'
 import { DragTracker, SIDES, defaultY, readDock, writeDock } from './dock.js'
 import { sanitiseUser } from './user.js'
+import { LogCapture } from './capture.js'
 import { parseRgbString, computeHoverRgb } from './colour.js'
 
 const BUG_CATEGORIES = [
@@ -25,9 +26,17 @@ export class PrGoblinWidget {
       side: 'right',
       icon: null,
       user: null,
+      captureLogs: true,
       ...config,
     }
     this._user = sanitiseUser(this._cfg.user)
+    // Start listening for errors straight away: the useful ones happen before
+    // the user decides to open the dialog.
+    this._capture = null
+    if (this._cfg.captureLogs !== false) {
+      this._capture = new LogCapture({ ignoreUrl: this._cfg.endpoint })
+      this._capture.install()
+    }
     if (this._cfg.variant !== 'tab') this._cfg.variant = 'pill'
     if (!SIDES.has(this._cfg.side)) this._cfg.side = 'right'
     this._type = 'bug'
@@ -428,6 +437,8 @@ export class PrGoblinWidget {
     this._statusEl.textContent = ''
 
     const ctx = captureContext()
+    // Captured errors only help with bugs; a feature request does not need them.
+    if (this._capture && this._type === 'bug') ctx.logs = this._capture.entries()
     const base = {
       type: this._type,
       screenshot: this._screenshot,
@@ -468,7 +479,7 @@ export class PrGoblinWidget {
       const { issueUrl, issueNumber } = await res.json()
       this._showStatus(
         'success',
-        issueUrl && /^https:\/\/github\.com\//.test(issueUrl) ? issueUrl : null,
+        issueUrl && /^https:\/\/(github\.com|linear\.app)\//.test(issueUrl) ? issueUrl : null,
         Number.isInteger(issueNumber) && issueNumber > 0 ? issueNumber : null,
       )
       this._reset()
@@ -540,6 +551,7 @@ export class PrGoblinWidget {
   }
 
   destroy() {
+    this._capture?.uninstall()
     document.removeEventListener('keydown', this._onKeydown)
     if (this._onResize) window.removeEventListener('resize', this._onResize)
     this._trigger?.remove()

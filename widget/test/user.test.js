@@ -63,3 +63,17 @@ describe('user option', () => {
     expect(JSON.parse(fetchMock.mock.calls[0][1].body).user).toBeNull()
   })
 })
+
+describe('sanitiseUser proof', () => {
+  it('passes a well-formed hex proof through with the login', async () => {
+    const { sanitiseUser } = await import('../src/user.js')
+    expect(sanitiseUser({ login: 'ada', proof: ' AbCdEf0123 ' })).toEqual({ name: null, login: 'ada', proof: 'AbCdEf0123' })
+  })
+
+  it('drops a proof that is not hex, or that comes without a login', async () => {
+    const { sanitiseUser } = await import('../src/user.js')
+    expect(sanitiseUser({ login: 'ada', proof: '<script>' })).toEqual({ name: null, login: 'ada' })
+    expect(sanitiseUser({ login: 'ada', proof: 42 })).toEqual({ name: null, login: 'ada' })
+    expect(sanitiseUser({ name: 'Ada', proof: 'abcd' })).toEqual({ name: 'Ada', login: null })
+  })
+})
