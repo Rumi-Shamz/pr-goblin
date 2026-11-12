@@ -3,7 +3,6 @@
 # Each run polls once, works the tickets that are due, opens PRs, and exits.
 # Nothing is kept between runs: progress lives on the ticket and the branch.
 #
-# NOTE: replace OWNER/pr-goblin with wherever pr-goblin is published.
 
 name: pr-goblin
 
@@ -30,7 +29,7 @@ jobs:
       - name: Get pr-goblin
         uses: actions/checkout@v4
         with:
-          repository: OWNER/pr-goblin
+          repository: Rumi-Shamz/pr-goblin
           path: pr-goblin
 
       - uses: oven-sh/setup-bun@v2

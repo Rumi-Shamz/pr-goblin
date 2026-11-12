@@ -1,7 +1,6 @@
 # Triage reports that arrive through the pr-goblin widget.
 # Copy to .github/workflows/triage.yml in your repo. GitHub Issues only.
 #
-# NOTE: replace OWNER/pr-goblin with wherever pr-goblin is published.
 
 name: pr-goblin triage
 
@@ -17,7 +16,7 @@ jobs:
     if: contains(github.event.issue.labels.*.name, 'user-feedback')
     runs-on: ubuntu-latest
     steps:
-      - uses: OWNER/pr-goblin/actions/triage@main
+      - uses: Rumi-Shamz/pr-goblin/actions/triage@main
         with:
           anthropic-api-key: ${{ secrets.ANTHROPIC_API_KEY }}
           # Optional: a push notification with an Approve button.
