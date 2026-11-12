@@ -59,6 +59,13 @@ describe("buildReviewPrompt", () => {
     expect(prompt).toContain("at most 5 findings")
   })
 
+  test("without a PR, diffs against the task's base branch", () => {
+    const task = { identifier: "WOR-54", title: "T", description: "", labels: [] }
+    const review = { round: 1, maxRounds: 1 }
+    expect(buildReviewPrompt({ task, review, baseBranch: "staging" })).toContain("git diff origin/staging...HEAD")
+    expect(buildReviewPrompt({ task, review })).toContain("git diff origin/main...HEAD")
+  })
+
   test("includes PR diff command when prUrl provided", () => {
     const prompt = buildReviewPrompt({
       task: {

@@ -16,6 +16,20 @@ export interface Env {
   TRUST_SECRET?: string
   /** Signs the "Approve" link the triage action sends. */
   WEBHOOK_SECRET?: string
+  /**
+   * "off" drops any screenshot a report carries, so none is stored. Enforces the widget's `screenshot: false`.
+   * "public" allows storing screenshots when GITHUB_REPO is a public repository, where anyone can read them.
+   * Unset: screenshots are stored only in a private repository.
+   */
+  SCREENSHOTS?: string
+}
+
+export function screenshotsDisabled(env: Env): boolean {
+  return (env.SCREENSHOTS ?? '').trim().toLowerCase() === 'off'
+}
+
+function screenshotsMayBePublic(env: Env): boolean {
+  return (env.SCREENSHOTS ?? '').trim().toLowerCase() === 'public'
 }
 
 function usesLinear(env: Env): boolean {
@@ -254,7 +268,9 @@ async function handleFeedback(
   const labels = ticketLabels(body.type, trusted)
 
   let screenshotUrl: string | null = null
-  if (body.screenshot) {
+  if (body.screenshot && screenshotsDisabled(env)) {
+    console.warn('[pr-goblin] screenshot dropped: SCREENSHOTS=off')
+  } else if (body.screenshot) {
     if (body.screenshot.length > 4_000_000) {
       return jsonError('Screenshot exceeds maximum size', 413, corsHeaders)
     }
@@ -439,7 +455,21 @@ async function uploadScreenshot(dataUrl: string, env: Env & { GITHUB_TOKEN: stri
       'Content-Type': 'application/json',
     }
 
-    await ensureScreenshotsBranch(owner, repo, headers)
+    // Screenshots are committed to the repo and linked from the ticket, so in a
+    // public repo anyone can read them. Refuse unless that was asked for, and
+    // when the visibility cannot be read, assume the worst.
+    const repoRes = await fetch(`https://api.github.com/repos/${owner}/${repo}`, { headers })
+    const repoData = repoRes.ok ? await repoRes.json() as { private?: boolean; default_branch?: string } : {}
+    if (repoData.private !== true && !screenshotsMayBePublic(env)) {
+      console.warn(
+        repoData.private === false
+          ? `[pr-goblin] screenshot dropped: ${env.GITHUB_REPO} is public, so anyone could read it. Set SCREENSHOTS=public to allow this.`
+          : `[pr-goblin] screenshot dropped: could not confirm ${env.GITHUB_REPO} is private (HTTP ${repoRes.status})`,
+      )
+      return null
+    }
+
+    await ensureScreenshotsBranch(owner, repo, headers, repoData.default_branch)
 
     const res = await fetch(`https://api.github.com/repos/${owner}/${repo}/contents/${filename}`, {
       method: 'PUT',
@@ -463,14 +493,11 @@ async function uploadScreenshot(dataUrl: string, env: Env & { GITHUB_TOKEN: stri
   }
 }
 
-async function ensureScreenshotsBranch(owner: string, repo: string, headers: Record<string, string>): Promise<void> {
+async function ensureScreenshotsBranch(owner: string, repo: string, headers: Record<string, string>, defaultBranch = 'main'): Promise<void> {
   const check = await fetch(`https://api.github.com/repos/${owner}/${repo}/git/refs/heads/${SCREENSHOTS_BRANCH}`, { headers })
   if (check.ok) return
 
-  const repoRes = await fetch(`https://api.github.com/repos/${owner}/${repo}`, { headers })
-  const repoData = await repoRes.json() as { default_branch: string }
-
-  const shaRes = await fetch(`https://api.github.com/repos/${owner}/${repo}/git/refs/heads/${repoData.default_branch}`, { headers })
+  const shaRes = await fetch(`https://api.github.com/repos/${owner}/${repo}/git/refs/heads/${defaultBranch}`, { headers })
   const shaData = await shaRes.json() as { object: { sha: string } }
 
   await fetch(`https://api.github.com/repos/${owner}/${repo}/git/refs`, {

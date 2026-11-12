@@ -16,8 +16,10 @@ jobs:
     if: contains(github.event.issue.labels.*.name, 'user-feedback')
     runs-on: ubuntu-latest
     steps:
-      - uses: Rumi-Shamz/pr-goblin/actions/triage@main
+      # @v0 follows the latest 0.x release; pin @v0.1.0 or a commit SHA to choose when to upgrade.
+      - uses: Rumi-Shamz/pr-goblin/actions/triage@v0
         with:
+          # Triage calls the Claude API directly, so it needs an API key; a subscription token does not work here.
           anthropic-api-key: ${{ secrets.ANTHROPIC_API_KEY }}
           # Optional: a push notification with an Approve button.
           # ntfy-topic: https://ntfy.sh/your-private-topic

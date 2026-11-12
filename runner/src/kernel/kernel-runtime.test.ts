@@ -216,4 +216,77 @@ describe("Kernel runtime behavior", () => {
     expect(createCalls).toEqual([["TES-1", "/fake/repos/acme/app", "main"]])
     expect(kernel.getTask("issue-1")?.repo).toBe("acme/app")
   })
+
+  test("an agent that hits a usage limit is requeued for the reset without spending a retry, and dispatch pauses", async () => {
+    const { Kernel } = await import(`./kernel?usage-limit=${Date.now()}`)
+    const kernel = new Kernel(createSource(), createConfig(), KERNEL_CONFIG)
+    const now = new Date("2026-11-12T10:00:00Z")
+    kernel.now = () => now
+    let spawned = 0
+    ;(kernel as any).spawnAndAttach = async (): Promise<void> => { spawned++ }
+    ;(kernel as any).store.set(createTask({ state: "active", retryCount: 1 }))
+
+    const resetEpoch = Math.floor(now.getTime() / 1000) + 3 * 3600
+    await (kernel as any).onAgentExit("issue-1", {
+      exitCode: 1,
+      stderr: `Claude AI usage limit reached|${resetEpoch}`,
+    })
+
+    const task = kernel.getTask("issue-1")!
+    expect(task.state).toBe("queued")
+    expect(task.retryCount).toBe(1)
+    expect(new Date(task.retryAfter!).getTime()).toBeGreaterThanOrEqual(resetEpoch * 1000)
+    expect(kernel.usagePausedUntil).toBeGreaterThanOrEqual(resetEpoch * 1000)
+
+    // Another ticket arrives: nothing is dispatched while paused.
+    ;(kernel as any).store.set(createTask({ id: "issue-2", identifier: "TES-2" }))
+    await (kernel as any).dispatch()
+    expect(spawned).toBe(0)
+  })
+
+  test("an ordinary agent failure still spends a retry", async () => {
+    const { Kernel } = await import(`./kernel?ordinary-failure=${Date.now()}`)
+    const kernel = new Kernel(createSource(), createConfig(), KERNEL_CONFIG)
+    ;(kernel as any).store.set(createTask({ state: "active" }))
+    await (kernel as any).onAgentExit("issue-1", { exitCode: 1, stderr: "TypeError: x is undefined" })
+    expect(kernel.getTask("issue-1")!.retryCount).toBe(1)
+    expect(kernel.usagePausedUntil).toBeNull()
+  })
+
+  test("a continuation is not spawned during a usage pause: the task is requeued without spending a round", async () => {
+    const { Kernel } = await import(`./kernel?continuation-pause=${Date.now()}`)
+    const source = { ...createSource(), fetchDisposition: async () => "actionable" as const }
+    const kernel = new Kernel(source, createConfig(), KERNEL_CONFIG)
+    const now = new Date("2026-11-12T10:00:00Z")
+    kernel.now = () => now
+    kernel.usagePausedUntil = now.getTime() + 3600_000
+    let spawned = 0
+    ;(kernel as any).spawnAndAttach = async (): Promise<void> => { spawned++ }
+    ;(kernel as any).store.set(createTask({ state: "active", round: 1, agent: "claude", workDir: "/tmp/w", worktree: "/tmp/w/repo" }))
+
+    await (kernel as any).tryContinuation(kernel.getTask("issue-1"), { exitCode: 0, stderr: "" })
+
+    const task = kernel.getTask("issue-1")!
+    expect(spawned).toBe(0)
+    expect(task.state).toBe("queued")
+    expect(task.round).toBe(1)
+    expect(task.retryCount).toBe(0)
+  })
+
+  test("reDispatch waits out a usage pause without spending a round", async () => {
+    const { Kernel } = await import(`./kernel?redispatch-pause=${Date.now()}`)
+    const kernel = new Kernel(createSource(), createConfig(), KERNEL_CONFIG)
+    const now = new Date("2026-11-12T10:00:00Z")
+    kernel.now = () => now
+    kernel.usagePausedUntil = now.getTime() + 3600_000
+    let spawned = 0
+    ;(kernel as any).spawnAndAttach = async (): Promise<void> => { spawned++ }
+    ;(kernel as any).store.set(createTask({ state: "published", round: 1, agent: "claude", workDir: "/tmp/w", worktree: "/tmp/w/repo" }))
+
+    await (kernel as any).reDispatch(kernel.getTask("issue-1"))
+
+    expect(spawned).toBe(0)
+    expect(kernel.getTask("issue-1")!.state).toBe("published")
+    expect(kernel.getTask("issue-1")!.round).toBe(1)
+  })
 })

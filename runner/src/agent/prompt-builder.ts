@@ -42,18 +42,21 @@ export function buildReviewPrompt(options: {
   task: ReviewPromptTask
   review: ReviewPromptMetadata
   prUrl?: string
+  /** Branch the work is based on; used when there is no PR to diff. Default "main". */
+  baseBranch?: string
 }): string {
   const { task, review, prUrl } = options
+  const base = options.baseBranch || "main"
 
   const diffSection = prUrl
     ? `**Important**: Use the canonical PR diff to determine what changed:
 \`\`\`bash
 gh pr diff "${prUrl}"
 \`\`\`
-Do NOT use \`git diff main\` — local main may be stale in worktrees.`
-    : `**Important**: Diff against \`origin/main\` (not local \`main\`):
+Do NOT use \`git diff ${base}\` — the local branch may be stale in worktrees.`
+    : `**Important**: Diff against \`origin/${base}\` (not local \`${base}\`):
 \`\`\`bash
-git diff origin/main...HEAD
+git diff origin/${base}...HEAD
 \`\`\``
 
   const previousFeedbackSection = review.round > 1 && review.previousFeedback?.trim()

@@ -83,7 +83,7 @@ export class WorkspaceManager {
       // Clean slate for retry/continuation
       await this.execInOrThrow(worktreeDir, ["git", "reset", "--hard"])
       await this.execInOrThrow(worktreeDir, ["git", "clean", "-fd"])
-      setupAgentContext(implementDir, buildAgentRules(repoName, rules), skillsFor(rules))
+      setupAgentContext(implementDir, buildAgentRules(repoName, { ...rules, baseBranch }), skillsFor(rules))
       const repoLink = resolve(implementDir, repoName)
       try { lstatSync(repoLink) } catch { symlinkSync(worktreeDir, repoLink) }
       return {
@@ -122,7 +122,7 @@ export class WorkspaceManager {
     this.writeWorktreeExclude(worktreeDir)
 
     // Create implement agent dir with context + symlink
-    setupAgentContext(implementDir, buildAgentRules(repoName, rules), skillsFor(rules))
+    setupAgentContext(implementDir, buildAgentRules(repoName, { ...rules, baseBranch }), skillsFor(rules))
     const repoLink = resolve(implementDir, repoName)
     try { lstatSync(repoLink) } catch { symlinkSync(worktreeDir, repoLink) }
 

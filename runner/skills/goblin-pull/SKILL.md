@@ -1,8 +1,8 @@
 ---
 name: goblin-pull
 description: |
-  Sync the current branch with origin/main via merge.
-  Use when your branch is behind main or push was rejected.
+  Sync the current branch with the base branch via merge.
+  Use when your branch is behind the base branch or push was rejected.
 ---
 
 # Pull
@@ -12,11 +12,13 @@ Merge-based sync. No rebase — keeps history linear and predictable for automat
 ## Steps
 
 1. Ensure working tree is clean. If not, commit or stash first.
-2. Fetch and merge:
+2. Fetch and merge the base branch. It is named under "Base Branch" in your
+   CLAUDE.md / AGENTS.md (`main` if none is named):
 
 ```sh
+BASE=main   # replace with the base branch from your CLAUDE.md
 git fetch origin
-git -c merge.conflictstyle=zdiff3 merge origin/main
+git -c merge.conflictstyle=zdiff3 merge "origin/$BASE"
 ```
 
 3. If conflicts:

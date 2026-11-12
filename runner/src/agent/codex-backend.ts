@@ -29,6 +29,7 @@ import { prepareCodexSandbox } from './codex-sandbox';
 import { collectStderr, killProcessTree } from './process-utils';
 import { noopLogger } from './types';
 import { spawnPath } from '../utils/path';
+import { agentEnv } from './auth';
 import type {
   AgentEventHandler,
   AgentTask,
@@ -93,6 +94,17 @@ async function pumpStdout(
   }
 }
 
+function codexErrorText(msg: JsonRpcNotification): string | undefined {
+  const p = (msg.params ?? {}) as Record<string, any>;
+  const candidates = [
+    msg.method === 'error' ? p.message ?? p.error?.message : undefined,
+    p.error?.message,
+    p.turn?.error?.message,
+  ];
+  const found = candidates.find((c) => typeof c === 'string' && c.trim());
+  return found as string | undefined;
+}
+
 export const codexBackend: AgentBackend = {
   name: 'codex',
   prepareSandbox: prepareCodexSandbox,
@@ -123,7 +135,7 @@ export const codexBackend: AgentBackend = {
       stdin: 'pipe',
       cwd: workDir,
       env: {
-        ...process.env,
+        ...agentEnv('codex', process.env),
         ...(options.sandbox?.env ?? {}),
         PATH: spawnPath(),
       },
@@ -143,6 +155,9 @@ export const codexBackend: AgentBackend = {
     });
 
     const onNotification = (msg: JsonRpcNotification) => {
+      // Keep error text (usage limits among them) where the kernel looks for exit reasons.
+      const errorText = codexErrorText(msg);
+      if (errorText) stderrBuffer.text += `${stderrBuffer.text ? '\n' : ''}${errorText}`;
       const result = mapCodexNotification(msg.method, msg.params);
       if (!result) return;
       if (result.threadId) resolvedThreadId = result.threadId;
@@ -204,6 +219,8 @@ export const codexBackend: AgentBackend = {
         return (await proc.exited) ?? 0;
       } catch (err) {
         log.error({ err, identifier: task.identifier }, 'codex turn failed');
+        const message = err instanceof Error ? err.message : String(err);
+        stderrBuffer.text += `${stderrBuffer.text ? '\n' : ''}${message}`;
         client.shutdown('turn error');
         killProcessTree(proc.pid);
         const exitCode = await proc.exited;
