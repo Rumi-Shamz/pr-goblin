@@ -16,6 +16,12 @@ export interface Env {
   TRUST_SECRET?: string
   /** Signs the "Approve" link the triage action sends. */
   WEBHOOK_SECRET?: string
+  /** "off" drops any screenshot a report carries, so none is stored. Enforces the widget's `screenshot: false`. */
+  SCREENSHOTS?: string
+}
+
+export function screenshotsDisabled(env: Env): boolean {
+  return (env.SCREENSHOTS ?? '').trim().toLowerCase() === 'off'
 }
 
 function usesLinear(env: Env): boolean {
@@ -254,7 +260,9 @@ async function handleFeedback(
   const labels = ticketLabels(body.type, trusted)
 
   let screenshotUrl: string | null = null
-  if (body.screenshot) {
+  if (body.screenshot && screenshotsDisabled(env)) {
+    console.warn('[pr-goblin] screenshot dropped: SCREENSHOTS=off')
+  } else if (body.screenshot) {
     if (body.screenshot.length > 4_000_000) {
       return jsonError('Screenshot exceeds maximum size', 413, corsHeaders)
     }

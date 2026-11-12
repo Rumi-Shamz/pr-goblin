@@ -14,20 +14,12 @@
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http'
 import worker, { jsonError, type Env } from './index'
 import { createRateLimiter, type RateLimiter } from './rate-limit'
+import { envFromRecord } from './lib'
 
 const MAX_BODY_BYTES = 6_000_000 // a 4 MB screenshot as base64, plus the form
 
 export function envFromProcess(env: Record<string, string | undefined> = process.env): Env {
-  return {
-    ALLOWED_ORIGIN: env.ALLOWED_ORIGIN ?? '',
-    GITHUB_TOKEN: env.GITHUB_TOKEN,
-    GITHUB_REPO: env.GITHUB_REPO,
-    LINEAR_API_KEY: env.LINEAR_API_KEY,
-    LINEAR_TEAM_KEY: env.LINEAR_TEAM_KEY,
-    LINEAR_PROJECT: env.LINEAR_PROJECT,
-    TRUST_SECRET: env.TRUST_SECRET,
-    WEBHOOK_SECRET: env.WEBHOOK_SECRET,
-  }
+  return envFromRecord(env)
 }
 
 function clientIp(req: IncomingMessage, trustProxy: boolean): string {

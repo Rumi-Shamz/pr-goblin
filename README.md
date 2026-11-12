@@ -112,7 +112,7 @@ Deploy the endpoint, then load the widget:
 
 The widget takes on the look of the page it is on. At start-up, and again each time the dialog opens or the page switches between light and dark, it reads the page's brand colour, background, text colour, font and corner radius — from design tokens such as `--primary` and `--radius` (shadcn/ui, Bootstrap, MUI, Mantine and similar) or, failing that, from the page's own buttons. Any `--bp-*` variable you set in your own CSS is left alone, `color: '#rrggbb'` still pins the brand colour, and `theme: 'none'` turns the behaviour off.
 
-Build the widget with `cd widget && pnpm install && pnpm build`. Pass `captureLogs: false` to turn off console and network error capture. Captured URLs have their query strings removed, and request and response bodies are never read.
+Build the widget with `cd widget && pnpm install && pnpm build`. Pass `captureLogs: false` to turn off console and network error capture. Pass `screenshot: false` to hide the screenshot option, for apps whose pages show data that must not leave as an image (set `SCREENSHOTS=off` on the intake to enforce it server-side). Captured URLs have their query strings removed, and request and response bodies are never read.
 
 **Intake as a Node server**
 
@@ -120,6 +120,16 @@ Build the widget with `cd widget && pnpm install && pnpm build`. Pass `captureLo
 cd intake && pnpm install && pnpm build:node
 ALLOWED_ORIGIN=https://yourapp.example GITHUB_REPO=owner/repo GITHUB_TOKEN=... node dist/node.mjs
 ```
+
+**Intake inside your own app.** If your app already has a server, mount the endpoint in it instead of deploying another service. `cd intake && pnpm build:lib` writes `dist/pr-goblin-intake.mjs`, one ES module with no dependencies; copy it into your app. In a Next.js route handler:
+
+```ts
+// app/api/feedback/route.ts
+import { handleFeedbackRequest, envFromRecord } from '@/vendor/pr-goblin-intake.mjs'
+export const POST = (req: Request) => handleFeedbackRequest(req, envFromRecord(process.env))
+```
+
+It answers at whatever path you mount it on. Rate limiting and a request-size cap are then yours to add, as is any check that the reporter is signed in.
 
 **Intake as a Cloudflare Worker:** `cd intake && pnpm install && pnpm run deploy`, with the same settings as Worker secrets.
 
@@ -130,6 +140,7 @@ ALLOWED_ORIGIN=https://yourapp.example GITHUB_REPO=owner/repo GITHUB_TOKEN=... n
 | `LINEAR_API_KEY`, `LINEAR_TEAM_KEY`, `LINEAR_PROJECT` | Create tickets in Linear instead. Set the GitHub pair as well if you want screenshots. |
 | `TRUST_SECRET` | Enables trusted reporters (below). |
 | `WEBHOOK_SECRET` | Enables the Approve link in triage notifications. |
+| `SCREENSHOTS` | `off` drops screenshots server-side, so none is stored. Pair with the widget's `screenshot: false`. |
 | `PORT`, `RATE_LIMIT_PER_MIN`, `TRUST_PROXY` | Node server only: port (8787), reports per IP per minute (5), read the client IP from `X-Forwarded-For`. |
 
 ### Trusted reporters

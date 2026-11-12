@@ -9,7 +9,8 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "build:node": "esbuild src/node.ts --bundle --platform=node --format=esm --target=node20 --outfile=dist/node.mjs",
-    "start": "node dist/node.mjs"
+    "start": "node dist/node.mjs",
+    "build:lib": "esbuild src/lib.ts --bundle --platform=neutral --format=esm --target=es2022 --main-fields=module,main --outfile=dist/pr-goblin-intake.mjs"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^5.20260818.1",
