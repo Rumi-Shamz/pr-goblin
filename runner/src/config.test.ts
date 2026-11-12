@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, test } from "bun:test"
+import { afterEach, beforeEach, describe, expect, test } from "bun:test"
 import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "fs"
 import { tmpdir } from "os"
 import { join, resolve } from "path"
@@ -21,7 +21,27 @@ function writeSettings(homeDir: string, settings: Record<string, unknown>): void
   writeFileSync(join(settingsDir, "settings.json"), JSON.stringify(settings, null, 2))
 }
 
+// loadConfig merges settings from the environment. CI sets some of these
+// (GitHub Actions always sets GITHUB_REPOSITORY), so clear them per test.
+const ENV_SETTING_KEYS = [
+  "GOBLIN_SOURCE", "GOBLIN_REPO", "GITHUB_REPOSITORY", "GOBLIN_BASE_BRANCH", "GOBLIN_LINEAR_TEAM",
+  "GOBLIN_LINEAR_PROJECT", "GOBLIN_AGENT", "GOBLIN_MAX_CONCURRENT", "LINEAR_API_KEY",
+]
+const savedEnvSettings = new Map<string, string | undefined>()
+
+beforeEach((): void => {
+  for (const key of ENV_SETTING_KEYS) {
+    savedEnvSettings.set(key, process.env[key])
+    delete process.env[key]
+  }
+})
+
 afterEach((): void => {
+  for (const [key, value] of savedEnvSettings) {
+    if (value !== undefined) process.env[key] = value
+    else delete process.env[key]
+  }
+  savedEnvSettings.clear()
   for (const dir of createdDirs.splice(0)) {
     rmSync(dir, { recursive: true, force: true })
   }
