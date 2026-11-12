@@ -1,0 +1,85 @@
+# Release on a version tag: `git tag v0.2.0 && git push origin v0.2.0`.
+#
+# 1. Runs the tests.
+# 2. Publishes a GitHub release with the built widget and intake files, so
+#    people who copy them into their app can take a known version.
+# 3. Moves the major tag (v0, v1, …) to this release. The example workflows
+#    reference that tag, so users on it get the release on their next run, and
+#    users who pinned an exact tag or SHA are unaffected.
+#
+# Write the release notes under the version's heading in CHANGELOG.md first.
+
+name: Release
+
+on:
+  push:
+    tags: ['v[0-9]+.[0-9]+.[0-9]+']
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: oven-sh/setup-bun@v2
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.1.2
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Test the runner
+        working-directory: runner
+        run: bun install --frozen-lockfile && bunx tsc --noEmit && bun test src/
+
+      - name: Test and build the widget
+        working-directory: widget
+        run: pnpm install --frozen-lockfile && pnpm test && pnpm build
+
+      - name: Test and build the intake
+        working-directory: intake
+        run: pnpm install --frozen-lockfile && pnpm test && pnpm typecheck && pnpm build:lib && pnpm build:node
+
+      - name: Test the triage action
+        working-directory: actions/triage
+        run: pnpm install --frozen-lockfile && pnpm test
+
+      - name: Release notes from CHANGELOG.md
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          awk -v v="$version" '
+            /^## / { if (found) exit; if (index($0, "## " v " ") == 1 || $0 == "## " v) { found = 1; next } }
+            found { print }
+          ' CHANGELOG.md > notes.md
+          if [ ! -s notes.md ]; then
+            echo "::error::CHANGELOG.md has no section for $version"
+            exit 1
+          fi
+
+      - name: Publish the GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cp widget/dist/pr-goblin.iife.js "pr-goblin-widget-${GITHUB_REF_NAME}.iife.js"
+          cp intake/dist/pr-goblin-intake.mjs "pr-goblin-intake-${GITHUB_REF_NAME}.mjs"
+          cp intake/dist/node.mjs "pr-goblin-intake-node-${GITHUB_REF_NAME}.mjs"
+          gh release create "$GITHUB_REF_NAME" --title "$GITHUB_REF_NAME" --notes-file notes.md --verify-tag \
+            "pr-goblin-widget-${GITHUB_REF_NAME}.iife.js" \
+            "pr-goblin-intake-${GITHUB_REF_NAME}.mjs" \
+            "pr-goblin-intake-node-${GITHUB_REF_NAME}.mjs"
+
+      - name: Move the major tag
+        run: |
+          major="${GITHUB_REF_NAME%%.*}"
+          git tag -f "$major" "$GITHUB_SHA"
+          git push -f origin "refs/tags/$major"

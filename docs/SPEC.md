@@ -35,9 +35,14 @@ A module you plug into a project so that issues reported by users and testers ar
 | Intake: Node server with rate limiting | yes | 7, over real HTTP |
 | Intake: Approve webhook relabels the issue | yes | 6 |
 | Widget: console and network error capture | yes | 12 |
+| Widget: screenshot masking and reporter redaction | yes | 7 (masking in jsdom; the canvas paint step is not exercised there) |
+| Intake: screenshots stored only in a private repo | yes | 3 |
+| Runner: subscription sign-in detection, `GOBLIN_AUTH` | yes | 8 |
+| Runner: usage limits pause instead of failing | yes | 8 + 2 kernel |
+| Tagged releases, `v0` major tag | workflow written | not yet run |
 | Triage action (from bugpilot) | yes, unchanged apart from naming | 33 |
 
-Test totals at this commit: runner 335, intake 74, widget 63, triage 33.
+Test totals at this commit: runner 358, intake 82, widget 94, triage 33.
 
 ## What has not been verified
 
@@ -49,6 +54,8 @@ Be clear about these before relying on it.
 4. **Investigate mode is enforced by instructions only.** See the threat model.
 5. **`goblin once` was smoke-tested live only on the empty path** (poll a real repo, find nothing, exit 0).
 6. **`goblin init` is still the Linear-only wizard** inherited from reeve.
+7. **Usage-limit detection is matched against known message formats, not observed live.** Claude's messages ("usage limit reached|<epoch>", "5-hour limit reached ∙ resets 3pm") and API 429s are recognised; Codex's are best effort, and a Codex limit that exits with code 0 would not be caught. An unrecognised limit falls back to the ordinary retry, which spends retries and may park the ticket.
+8. **Screenshot masking was checked in Chromium only.** Form values, `data-goblin-mask` and custom selectors were blacked out in the captured image and the reporter's box was painted into the outgoing image; Firefox and Safari were not tried.
 
 ## Not built yet
 
@@ -61,7 +68,7 @@ Be clear about these before relying on it.
 | Screenshots without a GitHub repo | With a Linear-only intake the screenshot is dropped. Linear's file upload API is the fix. |
 | Chat intake | Planned as an optional extension, bring your own key. |
 | Single-binary runner | `bun build --compile`, so users need no Bun install. |
-| Publishing | npm package for the widget, a tagged release for the action. |
+| npm packages | Releases ship on GitHub (tags, built files). The name `pr-goblin` is reserved on npm by the maintainer (a 0.0.1 placeholder); publishing the widget and intake there would let `npm update` deliver them. |
 
 ## Suggested order
 
