@@ -1,5 +1,5 @@
 {
-  "name": "pr-goblin-worker",
+  "name": "pr-goblin-intake",
   "version": "0.1.0",
   "private": true,
   "scripts": {
@@ -7,10 +7,14 @@
     "deploy": "wrangler deploy",
     "cf-typegen": "wrangler types",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run"
+    "test": "vitest run",
+    "build:node": "esbuild src/node.ts --bundle --platform=node --format=esm --target=node20 --outfile=dist/node.mjs",
+    "start": "node dist/node.mjs"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^5.20260818.1",
+    "@types/node": "^26.6.6",
+    "esbuild": "^0.28.2",
     "typescript": "^7.0.2",
     "vite": "^8.3.5",
     "vitest": "^4.1.12",

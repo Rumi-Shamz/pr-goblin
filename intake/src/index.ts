@@ -1,11 +1,29 @@
 import { z } from 'zod'
+import { createLinearIssue } from './linear'
+import { logsSchema, renderLogsSection, sanitiseLogs } from './logs'
+import { isTrustedReporter, READY_LABEL, ticketLabels, UNTRUSTED_LABEL } from './trust'
 
 export interface Env {
-  GITHUB_TOKEN: string
-  GITHUB_REPO: string
   ALLOWED_ORIGIN: string
+  /** GitHub target (and screenshot storage). Required unless Linear is the target. */
+  GITHUB_TOKEN?: string
+  GITHUB_REPO?: string
+  /** Linear target. When both are set, tickets are created in Linear instead of GitHub Issues. */
+  LINEAR_API_KEY?: string
+  LINEAR_TEAM_KEY?: string
+  LINEAR_PROJECT?: string
+  /** Shared with the host app's backend to prove a reporter is a trusted tester. See trust.ts. */
+  TRUST_SECRET?: string
+  /** Signs the "Approve" link the triage action sends. */
   WEBHOOK_SECRET?: string
-  APPLY_FIX_WORKFLOW?: string
+}
+
+function usesLinear(env: Env): boolean {
+  return !!(env.LINEAR_API_KEY && env.LINEAR_TEAM_KEY)
+}
+
+function hasGitHub(env: Env): env is Env & { GITHUB_TOKEN: string; GITHUB_REPO: string } {
+  return !!(env.GITHUB_TOKEN && env.GITHUB_REPO)
 }
 
 // Runtime schema for the /feedback payload. Presence-only guards proved
@@ -24,6 +42,7 @@ export const contextSchema = z.looseObject({
   timezone: z.string().max(100).nullish(),
   language: z.string().max(50).nullish(),
   referrer: z.string().max(2000).nullish(),
+  logs: logsSchema,
 })
 
 // Optional reporter identity from a signed-in host. Plain text only: angle
@@ -34,6 +53,8 @@ const plainText = (max: number) =>
 export const userSchema = z.object({
   name: plainText(120),
   login: plainText(120),
+  // Hex HMAC-SHA256 of `login`, minted by the host backend. See trust.ts.
+  proof: z.string().max(200).nullish(),
 }).nullish()
 
 export const submissionSchema = z.object({
@@ -136,7 +157,10 @@ export default {
       'Access-Control-Allow-Methods': 'POST, OPTIONS',
       'Access-Control-Allow-Headers': 'Content-Type',
     }
-    for (const name of ['ALLOWED_ORIGIN', 'GITHUB_REPO', 'GITHUB_TOKEN'] as const) {
+    const required: (keyof Env)[] = usesLinear(env)
+      ? ['ALLOWED_ORIGIN']
+      : ['ALLOWED_ORIGIN', 'GITHUB_REPO', 'GITHUB_TOKEN']
+    for (const name of required) {
       if (!env[name]) {
         console.error(`[pr-goblin] worker misconfigured: ${name} is not set`)
         return jsonError(`Worker misconfigured: ${name} is not set`, 500, fallbackCors)
@@ -166,8 +190,9 @@ export default {
         return await handleFeedback(request, env, corsHeaders)
       }
 
-      if (request.method === 'POST' && url.pathname === '/webhook/apply-fix') {
-        return await handleApplyFix(request, env, corsHeaders)
+      // '/webhook/apply-fix' is the path the imported triage action calls; '/webhook/approve' is its new name.
+      if (request.method === 'POST' && (url.pathname === '/webhook/approve' || url.pathname === '/webhook/apply-fix')) {
+        return await handleApprove(request, env, corsHeaders)
       }
 
       return new Response('Not found', { status: 404, headers: corsHeaders })
@@ -218,26 +243,52 @@ async function handleFeedback(
           login: neutraliseMarkers(parsed.data.user.login),
         }
       : null,
+    context: {
+      ...parsed.data.context,
+      logs: sanitiseLogs(parsed.data.context.logs).map((l) => ({ ...l, message: neutraliseMarkers(l.message) ?? '' })),
+    },
   }
 
-  const [owner, repo] = env.GITHUB_REPO.split('/')
-  if (!owner || !repo) {
-    return jsonError('Worker misconfigured: GITHUB_REPO must be "owner/repo"', 500, corsHeaders)
-  }
+  // Trust is decided from the raw login + proof, before any rewriting.
+  const trusted = await isTrustedReporter(parsed.data.user?.login, parsed.data.user?.proof, env.TRUST_SECRET)
+  const labels = ticketLabels(body.type, trusted)
 
   let screenshotUrl: string | null = null
   if (body.screenshot) {
     if (body.screenshot.length > 4_000_000) {
       return jsonError('Screenshot exceeds maximum size', 413, corsHeaders)
     }
-    screenshotUrl = await uploadScreenshot(body.screenshot, env)
+    // Screenshots are stored in the GitHub repo. With a Linear-only setup there is nowhere to put one.
+    if (hasGitHub(env)) screenshotUrl = await uploadScreenshot(body.screenshot, env)
+    else console.warn('[pr-goblin] screenshot dropped: no GitHub repo configured to store it')
   }
 
   const issueTitle = buildTitle(body)
   const issueBody = buildIssueBody(body, screenshotUrl)
-  const labels = body.type === 'feature'
-    ? ['user-feedback', 'enhancement']
-    : ['user-feedback', 'bug']
+
+  if (usesLinear(env)) {
+    try {
+      const created = await createLinearIssue(
+        { apiKey: env.LINEAR_API_KEY!, teamKey: env.LINEAR_TEAM_KEY!, projectSlug: env.LINEAR_PROJECT || undefined },
+        { title: issueTitle, body: issueBody, labels, ready: labels.includes(READY_LABEL) },
+      )
+      return new Response(
+        JSON.stringify({ ok: true, issueUrl: created.url, issueId: created.identifier, trusted }),
+        { status: 201, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+      )
+    } catch (err) {
+      console.error('[pr-goblin] Linear issue creation failed', err)
+      return jsonError('Failed to create Linear issue', 502, corsHeaders)
+    }
+  }
+
+  if (!hasGitHub(env)) {
+    return jsonError('Worker misconfigured: no ticket target is set', 500, corsHeaders)
+  }
+  const [owner, repo] = env.GITHUB_REPO.split('/')
+  if (!owner || !repo) {
+    return jsonError('Worker misconfigured: GITHUB_REPO must be "owner/repo"', 500, corsHeaders)
+  }
 
   await ensureLabelsExist(owner, repo, labels, env.GITHUB_TOKEN)
 
@@ -262,33 +313,38 @@ async function handleFeedback(
   const issue = await issueRes.json() as { html_url: string; number: number }
 
   return new Response(
-    JSON.stringify({ ok: true, issueUrl: issue.html_url, issueNumber: issue.number }),
+    JSON.stringify({ ok: true, issueUrl: issue.html_url, issueNumber: issue.number, trusted }),
     { status: 201, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
   )
 }
 
-async function handleApplyFix(
+/**
+ * A human approved a report (the "Approve" button in the triage notification).
+ * Approval means: this ticket is trusted now. The `untrusted` label comes off
+ * and the ready label goes on, and the runner picks it up on its next poll.
+ */
+async function handleApprove(
   request: Request,
   env: Env,
   corsHeaders: Record<string, string>,
 ): Promise<Response> {
   if (!env.WEBHOOK_SECRET) {
-    return jsonError('Apply-fix webhook not configured on this worker', 503, corsHeaders)
+    return jsonError('Approve webhook not configured on this worker', 503, corsHeaders)
+  }
+  if (!hasGitHub(env)) {
+    return jsonError('Approve webhook needs a GitHub repo', 503, corsHeaders)
   }
 
   const token = request.headers.get('x-approval-token') ?? ''
   const approved = token ? await verifyApprovalToken({ token, webhookSecret: env.WEBHOOK_SECRET }) : null
   if (!approved) {
-    // A missing, forged or expired token is the one probe on this worker
-    // worth a trace: it is the sole gate on dispatching the apply-fix
-    // workflow.
     console.warn(`[pr-goblin] webhook auth failure from ${request.headers.get('CF-Connecting-IP') ?? 'unknown ip'}`)
     return jsonError('Unauthorized', 401, corsHeaders)
   }
 
   // owner/repo/issueNumber come from the verified token, not from the
   // request body: the token is the only thing here proven not to have been
-  // forged, so it is the only thing that gets to decide what gets dispatched.
+  // forged, so it is the only thing that gets to decide what is approved.
   const { owner, repo, issueNumber } = approved
 
   const [configOwner, configRepo] = env.GITHUB_REPO.split('/')
@@ -296,29 +352,31 @@ async function handleApplyFix(
     return jsonError('Repo mismatch', 403, corsHeaders)
   }
 
-  const workflowFile = env.APPLY_FIX_WORKFLOW || 'apply-fix.yml'
-  const dispatchRes = await fetch(
-    `https://api.github.com/repos/${owner}/${repo}/actions/workflows/${workflowFile}/dispatches`,
-    {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${env.GITHUB_TOKEN}`,
-        Accept: 'application/vnd.github+json',
-        'X-GitHub-Api-Version': '2022-11-28',
-        'User-Agent': 'pr-goblin-worker/0.1',
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        ref: 'main',
-        inputs: { issue_number: String(issueNumber) },
-      }),
-    },
-  )
+  const headers = {
+    Authorization: `Bearer ${env.GITHUB_TOKEN}`,
+    Accept: 'application/vnd.github+json',
+    'X-GitHub-Api-Version': '2022-11-28',
+    'User-Agent': 'pr-goblin-worker/0.1',
+    'Content-Type': 'application/json',
+  }
+  const issueUrl = `https://api.github.com/repos/${owner}/${repo}/issues/${issueNumber}`
 
-  if (!dispatchRes.ok) {
-    const text = await dispatchRes.text()
-    console.error('[pr-goblin] workflow_dispatch failed', dispatchRes.status, text)
-    return jsonError('Failed to trigger apply-fix workflow', 502, corsHeaders)
+  await ensureLabelsExist(owner, repo, [READY_LABEL], env.GITHUB_TOKEN)
+  const addRes = await fetch(`${issueUrl}/labels`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({ labels: [READY_LABEL] }),
+  })
+  if (!addRes.ok) {
+    console.error('[pr-goblin] approve: adding the ready label failed', addRes.status, await addRes.text())
+    return jsonError('Failed to approve the issue', 502, corsHeaders)
+  }
+
+  // 404 here just means the issue was never marked untrusted.
+  const removeRes = await fetch(`${issueUrl}/labels/${encodeURIComponent(UNTRUSTED_LABEL)}`, { method: 'DELETE', headers })
+  if (!removeRes.ok && removeRes.status !== 404) {
+    console.error('[pr-goblin] approve: removing the untrusted label failed', removeRes.status, await removeRes.text())
+    return jsonError('Failed to approve the issue', 502, corsHeaders)
   }
 
   return new Response(JSON.stringify({ ok: true }), {
@@ -331,6 +389,8 @@ const LABEL_DEFAULTS: Record<string, { color: string; description: string }> = {
   'user-feedback': { color: '0075ca', description: 'Submitted via pr-goblin feedback widget' },
   'bug':           { color: 'd73a4a', description: 'Something is not working' },
   'enhancement':   { color: 'a2eeef', description: 'New feature or request' },
+  [READY_LABEL]:     { color: '5319e7', description: 'pr-goblin may work on this' },
+  [UNTRUSTED_LABEL]: { color: 'b60205', description: 'From an unverified reporter: needs human triage before any code is written' },
 }
 
 async function ensureLabelsExist(owner: string, repo: string, labels: string[], token: string): Promise<void> {
@@ -361,9 +421,9 @@ async function ensureLabelsExist(owner: string, repo: string, labels: string[], 
 
 const SCREENSHOTS_BRANCH = 'bug-report-screenshots'
 
-async function uploadScreenshot(dataUrl: string, env: Env): Promise<string | null> {
+async function uploadScreenshot(dataUrl: string, env: Env & { GITHUB_TOKEN: string; GITHUB_REPO: string }): Promise<string | null> {
   try {
-    const [owner, repo] = env.GITHUB_REPO.split('/')
+    const [owner, repo] = env.GITHUB_REPO.split('/') as [string, string]
     const match = dataUrl.match(/^data:image\/(png|jpeg|gif|webp);base64,/)
     if (!match) {
       console.error('[pr-goblin] screenshot rejected: unsupported MIME type')
@@ -519,7 +579,7 @@ ${stepsSection}## Details
 | Timestamp | ${ctx.timestamp} |
 | Project | ${body.projectName ?? '—'} |
 
-${reporterLine(body.user)}${screenshotSection}<!-- pr-goblin:structured
+${reporterLine(body.user)}${screenshotSection}${renderLogsSection(ctx.logs ?? [])}<!-- pr-goblin:structured
 ${structured}
 pr-goblin:end -->
 `
@@ -617,6 +677,7 @@ const STATUS_TITLES: Record<number, string> = {
   401: 'Unauthorized',
   403: 'Forbidden',
   413: 'Payload Too Large',
+  429: 'Too Many Requests',
   500: 'Internal Server Error',
   502: 'Bad Gateway',
   503: 'Service Unavailable',
