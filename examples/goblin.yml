@@ -41,8 +41,19 @@ jobs:
 
       - name: Git identity for the agent's commits
         run: |
-          git config --global user.name "pr-goblin"
-          git config --global user.email "pr-goblin@users.noreply.github.com"
+          # Commit as the token's owner. A made-up noreply address such as
+          # pr-goblin@users.noreply.github.com belongs to whichever GitHub account
+          # has that login, and hosts like Vercel refuse to deploy commits by
+          # authors outside the team. The built-in token has no user, so it
+          # falls back to the github-actions bot.
+          if owner=$(gh api user -q '"\(.id) \(.login)"' 2>/dev/null); then
+            read -r id login <<<"$owner"
+            git config --global user.name "$login"
+            git config --global user.email "$id+$login@users.noreply.github.com"
+          else
+            git config --global user.name "github-actions[bot]"
+            git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          fi
           gh auth setup-git
         env:
           GH_TOKEN: ${{ secrets.GOBLIN_GH_TOKEN || github.token }}
