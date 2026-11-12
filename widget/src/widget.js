@@ -28,6 +28,9 @@ export class PrGoblinWidget {
       icon: null,
       user: null,
       captureLogs: true,
+      // false hides the screenshot option, for apps whose pages show data that
+      // must not leave in an image.
+      screenshot: true,
       theme: 'auto',
       ...config,
     }
@@ -361,13 +364,13 @@ export class PrGoblinWidget {
           </div>
         </div>
 
-        <div class="bp-field">
+        ${this._cfg.screenshot === false ? '' : `<div class="bp-field">
           <span class="bp-label">Screenshot <span>(optional)</span></span>
           <div class="bp-screenshot-row">
             <button class="bp-btn-ghost" id="bp-capture-btn" type="button">Capture screenshot</button>
           </div>
           <img class="bp-screenshot-preview" id="bp-screenshot-preview" alt="Screenshot preview" />
-        </div>
+        </div>`}
         <div class="bp-field">
           <span class="bp-label">Context</span>
           <div class="bp-context" id="bp-context-chips"></div>
@@ -430,7 +433,7 @@ export class PrGoblinWidget {
     this._expectedEl.addEventListener('input', () => this._updateSubmit())
     this._featureAskEl.addEventListener('input', () => this._updateSubmit())
 
-    this._captureBtn.addEventListener('click', async () => {
+    this._captureBtn?.addEventListener('click', async () => {
       this._captureBtn.disabled = true
       this._captureBtn.textContent = 'Capturing…'
       try {
@@ -479,7 +482,7 @@ export class PrGoblinWidget {
     if (this._capture && this._type === 'bug') ctx.logs = this._capture.entries()
     const base = {
       type: this._type,
-      screenshot: this._screenshot,
+      screenshot: this._cfg.screenshot === false ? null : this._screenshot,
       context: ctx,
       projectName: this._cfg.projectName || document.title,
       user: this._user,
@@ -565,9 +568,11 @@ export class PrGoblinWidget {
     this._featureWhyEl.value = ''
     this._featurePriorityEl.value = 'critical'
     this._screenshot = null
-    this._screenshotPreview.src = ''
-    this._screenshotPreview.classList.remove('bp-visible')
-    this._captureBtn.textContent = 'Capture screenshot'
+    if (this._screenshotPreview) {
+      this._screenshotPreview.src = ''
+      this._screenshotPreview.classList.remove('bp-visible')
+    }
+    if (this._captureBtn) this._captureBtn.textContent = 'Capture screenshot'
     this._updateSubmit()
   }
 
