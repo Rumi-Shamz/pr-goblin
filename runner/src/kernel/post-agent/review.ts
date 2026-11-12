@@ -33,6 +33,7 @@ Project code is in the \`${repoName}/\` subdirectory.
       },
       review: { round: 1, maxRounds: 1 },
       prUrl: ctx.prUrl,
+      baseBranch: ctx.task.baseBranch,
     })
     return base + buildReviewOutputContract(ctx.task.identifier, ctx.prUrl)
   },

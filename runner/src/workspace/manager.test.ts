@@ -1,5 +1,5 @@
 import { afterAll, describe, expect, test } from "bun:test"
-import { existsSync, lstatSync, mkdirSync, writeFileSync } from "fs"
+import { existsSync, lstatSync, mkdirSync, readFileSync, writeFileSync } from "fs"
 import { basename, join, resolve } from "path"
 
 import { WorkspaceManager } from "./manager"
@@ -90,6 +90,29 @@ describe("WorkspaceManager git failure handling", () => {
 })
 
 describe("WorkspaceManager per-task layout", () => {
+  test("createForTask: cuts the worktree from a non-main base and tells the agent to target it", async (): Promise<void> => {
+    const repoDir = createRepoWithOrigin("goblin-task-base-")
+    runGit(repoDir, ["checkout", "-b", "staging"])
+    writeFileSync(join(repoDir, "STAGING.md"), "only on staging\n")
+    runGit(repoDir, ["add", "STAGING.md"])
+    runGit(repoDir, ["commit", "-m", "chore: staging only"])
+    runGit(repoDir, ["push", "origin", "staging"])
+    const manager = createManager()
+
+    const info = await manager.createForTask("WOR-210", repoDir, "staging", false, { tracker: "github" })
+
+    expect(existsSync(resolve(info.worktreeDir, "STAGING.md"))).toBe(true)
+    for (const file of ["CLAUDE.md", "AGENTS.md"]) {
+      const rules = readFileSync(resolve(info.workDir, file), "utf8")
+      expect(rules).toContain("## Base Branch: `staging`")
+      expect(rules).toContain("gh pr create --base staging")
+    }
+
+    // The retry path rewrites the rules and must keep the base branch.
+    const again = await manager.createForTask("WOR-210", repoDir, "staging", true, { tracker: "github" })
+    expect(readFileSync(resolve(again.workDir, "CLAUDE.md"), "utf8")).toContain("gh pr create --base staging")
+  })
+
   test("createForTask: creates task dir with implement agent dir and repo-named worktree", async (): Promise<void> => {
     const repoDir = createRepoWithOrigin("goblin-task-create-")
     const manager = createManager()

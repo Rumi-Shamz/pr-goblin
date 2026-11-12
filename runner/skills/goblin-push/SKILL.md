@@ -19,7 +19,7 @@ description: |
 git push -u origin HEAD
 ```
 
-If rejected (non-fast-forward), use the `goblin-pull` skill to sync with main, then retry.
+If rejected (non-fast-forward), use the `goblin-pull` skill to sync with the base branch, then retry.
 Only use `--force-with-lease` if you intentionally rewrote history (e.g. after rework).
 
 ## Pull Request
@@ -30,9 +30,12 @@ Check if a PR already exists:
 pr_url=$(gh pr view --json url -q .url 2>/dev/null || true)
 ```
 
-**No existing PR** — create one:
+**No existing PR** — create one. Always pass `--base` with the base branch named
+under "Base Branch" in your CLAUDE.md / AGENTS.md (`main` if none is named);
+without it the PR targets the repository's default branch, which may be wrong.
 
 ```sh
+BASE=main   # replace with the base branch from your CLAUDE.md
 # Write body to a temp file to avoid shell escaping issues
 cat > /tmp/pr-body.md << 'EOF'
 ## Summary
@@ -46,7 +49,7 @@ Fixes ISSUE-ID
 *Automated by pr-goblin*
 EOF
 
-gh pr create --title "ISSUE-ID: <concise title>" --body-file /tmp/pr-body.md
+gh pr create --base "$BASE" --title "ISSUE-ID: <concise title>" --body-file /tmp/pr-body.md
 ```
 
 **PR exists and open** — update if needed:
@@ -60,7 +63,7 @@ gh pr edit --title "ISSUE-ID: <updated title if scope changed>"
 ```sh
 git checkout -b <new-branch-name>
 git push -u origin HEAD
-gh pr create --title "..." --body-file /tmp/pr-body.md
+gh pr create --base "$BASE" --title "..." --body-file /tmp/pr-body.md
 ```
 
 ## After

@@ -28,6 +28,8 @@ export type RulesMode = "implement" | "investigate"
 export interface RulesOptions {
   tracker?: RulesTracker
   mode?: RulesMode
+  /** Branch the worktree was cut from and the PR must target. Default "main". */
+  baseBranch?: string
 }
 
 interface TrackerVocab {
@@ -197,6 +199,17 @@ const SECTION_BLOCKED =
 
 Use ONLY when a required external resource is genuinely missing (auth, secrets, permissions, required tools). Exit with non-zero code — the runner will retry.`
 
+// Without this the agent's `gh pr create` targets the repository's default
+// branch, not the branch the worktree was cut from.
+const SECTION_BASE_BRANCH = (base: string): string =>
+`## Base Branch: \`${base}\`
+
+Your branch was created from \`origin/${base}\`. Pull requests target \`${base}\`, not the repository's default branch.
+
+- Open the PR with \`gh pr create --base ${base}\`.
+- Sync with \`origin/${base}\` (not \`origin/main\`) when your branch is behind or a push is rejected.
+- Diff against \`origin/${base}...HEAD\`.`
+
 const SECTION_SAFETY =
 `## Safety Rails
 
@@ -224,7 +237,7 @@ const SECTION_SKILLS = (t: TrackerVocab): string =>
 |-------|---------|
 | \`goblin-commit\` | Consistent, well-formed git commits |
 | \`goblin-push\` | Push branch + create/update PR |
-| \`goblin-pull\` | Sync with origin/main, resolve conflicts |
+| \`goblin-pull\` | Sync with the base branch, resolve conflicts |
 | \`${t.skill}\` | ${t.skillPurpose} |`
 
 // ── Investigate mode ───────────────────────────────────────
@@ -296,6 +309,7 @@ export function buildAgentRules(repoName: string, options: RulesOptions = {}): s
     SECTION_EXECUTION(t),
     SECTION_WORKPAD(t),
     SECTION_COMPLETION(t),
+    SECTION_BASE_BRANCH(options.baseBranch || "main"),
     SECTION_BLOCKED,
     SECTION_SAFETY,
     SECTION_SKILLS(t),

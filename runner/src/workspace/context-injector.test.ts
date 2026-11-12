@@ -77,6 +77,21 @@ describe("buildAgentRules", () => {
     }
   })
 
+  test("names the base branch the PR must target, defaulting to main", async () => {
+    const { buildAgentRules } = await import("./context-injector")
+    expect(buildAgentRules("app", { tracker: "github", baseBranch: "staging" })).toContain("gh pr create --base staging")
+    expect(buildAgentRules("app", { tracker: "github" })).toContain("gh pr create --base main")
+  })
+
+  test("the push skill always passes --base", () => {
+    const skill = readFileSync(resolve(import.meta.dir, "../../skills/goblin-push/SKILL.md"), "utf8")
+    const creates = skill.split("\n").filter((line) => line.includes("gh pr create"))
+    expect(creates.length).toBeGreaterThan(0)
+    for (const line of creates) expect(line).toContain("--base")
+    const pull = readFileSync(resolve(import.meta.dir, "../../skills/goblin-pull/SKILL.md"), "utf8")
+    expect(pull).not.toContain("merge origin/main")
+  })
+
   test("investigate mode is read-only and carries no commit or push skill", async () => {
     const { buildAgentRules, skillsFor } = await import("./context-injector")
     const rules = buildAgentRules("app", { tracker: "github", mode: "investigate" })
