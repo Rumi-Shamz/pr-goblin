@@ -1,0 +1,60 @@
+# pr-goblin runner on a schedule. Copy to .github/workflows/goblin.yml in your repo.
+#
+# Each run polls once, works the tickets that are due, opens PRs, and exits.
+# Nothing is kept between runs: progress lives on the ticket and the branch.
+#
+# NOTE: replace OWNER/pr-goblin with wherever pr-goblin is published.
+
+name: pr-goblin
+
+on:
+  schedule:
+    - cron: '*/15 * * * *'   # GitHub's minimum is 5 minutes, and runs are often late
+  workflow_dispatch:
+
+# One run at a time, so two runs never pick up the same ticket.
+concurrency:
+  group: pr-goblin
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+  issues: write
+  pull-requests: write
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - name: Get pr-goblin
+        uses: actions/checkout@v4
+        with:
+          repository: OWNER/pr-goblin
+          path: pr-goblin
+
+      - uses: oven-sh/setup-bun@v2
+
+      - name: Install the runner and the coding agent
+        run: |
+          cd pr-goblin/runner && bun install --frozen-lockfile
+          npm install -g @anthropic-ai/claude-code
+
+      - name: Git identity for the agent's commits
+        run: |
+          git config --global user.name "pr-goblin"
+          git config --global user.email "pr-goblin@users.noreply.github.com"
+          gh auth setup-git
+        env:
+          GH_TOKEN: ${{ secrets.GOBLIN_GH_TOKEN || github.token }}
+
+      - name: Work the queue
+        run: bun pr-goblin/runner/src/cli/app.ts once --timeout 50
+        env:
+          # A token of your own makes the PRs trigger your CI; the built-in one does not.
+          GH_TOKEN: ${{ secrets.GOBLIN_GH_TOKEN || github.token }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          # Tracker: GitHub Issues on this repo by default. For Linear, set these three:
+          LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}
+          GOBLIN_LINEAR_TEAM: ${{ vars.GOBLIN_LINEAR_TEAM }}
+          GOBLIN_LINEAR_PROJECT: ${{ vars.GOBLIN_LINEAR_PROJECT }}

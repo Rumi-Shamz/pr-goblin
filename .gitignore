@@ -10,3 +10,4 @@ dist/
 .test-tmp/
 coverage/
 .tools/
+!actions/triage/dist/

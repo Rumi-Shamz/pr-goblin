@@ -1,8 +1,8 @@
 {
   "name": "pr-goblin",
-  "version": "0.0.10",
+  "version": "0.1.0",
   "type": "module",
-  "description": "Self-hosted coding agent daemon that turns Linear tickets into pull requests using isolated AI agents",
+  "description": "pr-goblin runner: polls Linear or GitHub Issues and turns tickets into pull requests using isolated coding agents",
   "main": "./src/index.ts",
   "bin": {
     "goblin": "./src/cli/app.ts"
@@ -13,20 +13,14 @@
     "!src/test-helpers.ts",
     "!src/e2e/",
     "skills/",
-    "dashboard/dist/",
-    "assets/logo.txt",
     "tsconfig.json"
   ],
   "scripts": {
     "start": "bun src/cli/app.ts start",
     "run": "bun src/cli/app.ts run",
-    "restart": "bun src/cli/app.ts restart",
-    "dev-daemon": "bun --watch src/cli/app.ts daemon",
-    "dev-web": "cd dashboard && bun run dev",
+    "once": "bun src/cli/app.ts once",
     "test": "bun test src/",
-    "typecheck": "bunx tsc --noEmit",
-    "build-web": "cd dashboard && bun run build",
-    "prepublishOnly": "cd dashboard && bun install && bun run build"
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@clack/prompts": "^1.2.0",
@@ -48,13 +42,7 @@
   "engines": {
     "bun": ">=1.0.0"
   },
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/ianchenx/reeve.git"
-  },
-  "homepage": "https://github.com/ianchenx/reeve",
   "license": "MIT",
-  "author": "Ian Chen",
   "keywords": [
     "ai",
     "agent",
@@ -63,5 +51,6 @@
     "linear",
     "coding-agent",
     "automation"
-  ]
+  ],
+  "private": true
 }

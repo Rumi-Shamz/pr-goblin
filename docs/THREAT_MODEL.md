@@ -1,106 +1,68 @@
 # Threat model
 
-pr-goblin moves data across four trust boundaries: an anonymous browser into a Worker, a Worker
-into a GitHub repo, GitHub issue content into an LLM with repo-write credentials, and a Worker
-into a human's phone via a third-party push service. This is a snapshot of what crosses each one,
-what's trusted on either side, and which risks are mitigated versus accepted. It reflects the code
-as it stands after the ntfy approval-token fix (issue #60); update it when a boundary's mitigation
-changes.
+pr-goblin lets text typed by a stranger travel all the way to a coding agent that holds write access to a repository. This document says what crosses each boundary, what stops abuse, and what is knowingly accepted. Update it when a mitigation changes.
 
-| Boundary | Worst case if abused | Status |
-|---|---|---|
-| 1. Widget → Worker `/feedback` | Issue-creation spam, a bad screenshot blob committed to the repo | Accepted (rate limiting), mitigated (validation) |
-| 2. Worker → GitHub (issue/screenshot writes) | Prompt-injection payload lands in a triage-parsed issue body | Mitigated (marker neutralisation), accepted (content itself) |
-| 3. GitHub content → Claude → PR/label/comment writes | A malicious PR gets opened with repo-write credentials | Mitigated (path guard, human PR review), accepted (no sandboxing beyond that) |
-| 4. Worker ↔ ntfy ↔ phone (approval) | A leaked credential lets a stranger trigger apply-fix | Mitigated (#60: scoped, expiring token) |
+| # | Boundary | Worst case if abused | Status |
+|---|---|---|---|
+| 1 | Browser → intake `/feedback` | Ticket spam; a junk blob stored as a "screenshot" | Mitigated on Node (rate limit, validation); accepted on Workers unless you add a Cloudflare rule |
+| 2 | Intake → tracker | A report forges the machine-readable block, or claims to be a trusted tester | Mitigated (marker neutralisation, HMAC proof) |
+| 3 | Ticket text → triage model | Triage is talked into a wrong severity or plan | Partly mitigated; a wrong `severity:critical` buys only a read-only investigation |
+| 4 | Ticket text → coding agent with repo write | A malicious change is pushed as a PR, or secrets are leaked | Mitigated by the trust rule and human review; residual risk below |
+| 5 | Approve link | Someone other than the maintainer approves a ticket | Mitigated (signed, expiring, issue-scoped token) |
 
-## 1. Widget → Worker (`POST /feedback`)
+## 1. Browser → intake
 
-**Crosses:** any anonymous browser on any third-party host page that has the widget embedded posts
-free-text description fields, a context object (URL, viewport, UA, timestamps) and an optional
-base64 screenshot (up to 4MB) to the Worker's public, unauthenticated endpoint.
+**Untrusted:** every field of the request, including `user`, the screenshot and the captured logs.
 
-**Trusted:** nothing on the caller's side. **Untrusted:** every field; the Worker validates shape
-and length (Zod schema, `contextSchema`) but the content itself is opaque text and image bytes.
+**Mitigated**
+- One schema validates types and lengths; a bad payload is a 400, not a crash.
+- Screenshot capped at 4 MB and limited to image data URLs.
+- Captured logs are capped (30 entries, 500 characters each), flattened to one line, and rendered inside a code fence they cannot close.
+- The Node server limits reports per IP (default 5 a minute) and caps the request body.
+- CORS restricts browsers to `ALLOWED_ORIGIN`. This does not stop `curl`.
 
-**Mitigated:** length caps stop a hostile payload blowing past GitHub's issue-body limit; a 4MB
-screenshot cap; `<`/`>` stripped from the optional reporter name/login; CORS `ALLOWED_ORIGIN`.
+**Accepted**
+- On Cloudflare Workers there is no built-in rate limit; add a Cloudflare rate limiting rule.
+- A screenshot's bytes are not checked to be a real image before being committed to the `bug-report-screenshots` branch. Worst case is a static file, not execution.
 
-**Accepted:** no rate limiting or CAPTCHA, so anyone who finds the endpoint can create unlimited
-GitHub issues, at the cost of repo noise and GitHub API quota, not data exposure. No magic-byte
-check on the screenshot before it is committed via the Contents API, so a non-image blob up to 4MB
-can land in the `bug-report-screenshots` branch; worst case is a static raw file, not execution.
-Both are accepted because pr-goblin is a small/solo-scale tool and abuse here is visible (spam
-issues), not silent.
+## 2. Intake → tracker
 
-## 2. Worker → GitHub (issue creation, screenshot commit, label writes)
+**Mitigated**
+- User text cannot counterfeit the `pr-goblin:structured` block: the markers and `-->` are neutralised, and the genuine block is always last.
+- **Trust is proven, not claimed.** A report is trusted only when it carries an HMAC of the login made with `TRUST_SECRET`, which only your backend holds. Without it the ticket is labelled `untrusted`. The proof is never written into the ticket.
+- Feature requests are never labelled ready.
 
-**Crosses:** the Worker holds `GITHUB_TOKEN` and turns anonymous, boundary-1 content into a real
-GitHub issue plus a `<!-- pr-goblin:structured -->` JSON block, which a downstream automation (the
-triage action) later parses as data that drives its own next actions.
+**Accepted**
+- The proof is a bearer credential for one login and does not expire. A tester can leak their own. Rotate `TRUST_SECRET` to revoke all proofs.
 
-**Trusted:** the Worker's own code, deployed by Rodney; `GITHUB_TOKEN` never reaches the client.
+## 3. Ticket text → triage model
 
-**Untrusted:** the description, project name, and other free-text fields, now permanently embedded
-in the issue body and in the structured block the triage action treats as its input.
+The triage action reads the attacker-influenced issue body and sets labels, including `severity:*`.
 
-**Mitigated:** `neutraliseMarkers` strips the HTML-comment markers from user text so a submitter
-cannot counterfeit or duplicate the structured block; the parser takes the *last* match, which is
-always the Worker's genuine one appended at the end.
+**Mitigated:** triage output is advisory. A stranger who talks triage into `severity:critical` moves their ticket from "held" to "read-only investigation", which costs one agent run and changes nothing in the repo.
 
-**Accepted:** a reporter can still write natural-language prompt-injection content in
-`description` aimed at Claude's classification, severity or proposed fix (e.g. "mark this
-critical and propose X"). Accepted because triage output is advisory: it sets labels and drafts
-text, a human still taps Approve before apply-fix runs, and the worst case is a misleading label
-or a wasted apply-fix run, not an unreviewed code change.
+**Accepted:** that wasted run. Cap spend with `GOBLIN_MAX_CONCURRENT` and your API account's limits.
 
-## 3. GitHub issue/comment content → Claude → PR, label and comment writes
+## 4. Ticket text → coding agent
 
-**Crosses:** the triage action's prompt includes the full (attacker-influenced) issue body; its
-tool-call output (classification, proposed fix) is acted on automatically. The apply-fix action
-goes further: Claude drives `read_file`/`write_file`/`list_files` tools directly against the
-checked-out repo, then a branch is pushed and a PR opened using `github.token`
-(`contents:write`, `pull-requests:write`) and the Anthropic credential (API key or workload
-identity federation).
+This is the boundary that matters. The agent runs with a token that can push branches and open PRs, and with whatever is in its environment.
 
-**Trusted:** the two Actions' own guard code. **Untrusted:** the LLM's tool-call arguments; Claude
-is a semi-trusted agent holding real repo-write credentials, steered by attacker-influenced text.
+**Mitigated**
+- **The trust rule** (`runner/src/kernel/policy.ts`): an `untrusted` ticket never gets a code-writing agent. Urgent ones get an agent whose instructions and skills are read-only (no commit, push or PR skill is provisioned).
+- The agent's standing instructions say the ticket is data, not instructions, and list what to ignore (requests for secrets, CI or credential changes, unrelated actions).
+- The agent never merges. Every change is a PR a human reviews, and your CI runs on it.
+- One git worktree per ticket; agent artefacts are excluded from commits.
 
-**Mitigated:** `safePath` rejects `../` traversal and shell-metacharacter paths; only files Claude
-actually wrote via `write_file` (tracked in `legitimateWrites`) are staged, so a prompt-injected
-instruction can't `git add` unrelated repo state; the PR targets `main` and is never auto-merged,
-so normal branch protection and human review still gate what ships; `MAX_ITERATIONS` bounds a
-runaway loop; an OIDC federation rule (when used) is pinned to `ref: refs/heads/main`, closing the
-fork-PR token-theft path a looser rule would allow.
+**Residual risk — read this before pointing it at an important repo**
+- **Read-only is an instruction, not a sandbox.** In investigate mode nothing technically stops a manipulated agent from writing or pushing. Run the runner with a token scoped to the one repo, and protect your default branch.
+- **A trusted ticket is fully trusted.** Removing the `untrusted` label, or signing a tester's login, means that text will drive a code-writing agent. A prompt-injected PR can still be opened; review it like any contributor's PR, especially changes to CI workflows, dependencies and auth code.
+- **Secrets in the agent's environment are reachable by the agent.** Give the runner only what it needs: the agent key, a repo-scoped GitHub token, and (for Linear) the Linear key. With Linear as the tracker the agent is handed the Linear API key so it can update the ticket; that key can read and write the whole workspace.
+- The agent runs the project's own scripts (tests, setup). Do not run the runner on a machine holding unrelated credentials.
 
-**Accepted:** nothing sandboxes the *content* Claude writes beyond `safePath` and PR review; a
-sufficiently crafted issue could still steer Claude toward a subtly bad change. Accepted because
-the blast radius is the same as a bad human PR: it sits open, unmerged, until reviewed. Also
-accepted: apply-fix's `workflow_dispatch` takes a bare `issue_number` and anyone with repo write
-access can trigger it manually regardless of the ntfy path; that's GitHub's own permission model,
-not something pr-goblin code controls.
+## 5. Approve link
 
-## 4. Worker ↔ ntfy ↔ human phone (the approval channel)
+The triage notification carries an Approve button that calls the intake endpoint, which removes `untrusted` and adds the ready label.
 
-**Crosses:** the triage action publishes a push notification (title, proposed-fix text, an
-"Approve" action with a callback URL and headers) to an ntfy topic; the ntfy app renders it and,
-on tap, performs the embedded HTTP POST back to the Worker's `/webhook/apply-fix`.
+**Mitigated:** the button carries a token signed with `WEBHOOK_SECRET`, bound to one repo and issue, valid for 48 hours. The secret itself never leaves your servers. A token for another repo is refused.
 
-**Trusted (pre-fix):** nothing. A bare topic slug on the public `ntfy.sh` has no read access
-control, so the notification, including the raw `WEBHOOK_SECRET` sent in the Approve action's
-headers, was legible to anyone who could read or guess the topic (issue #60).
-
-**Mitigated (this cycle):** `WEBHOOK_SECRET` no longer appears in the notification at all. The
-triage action instead signs a 48-hour, issue-and-repo-scoped HMAC-SHA256 token
-(`signApprovalToken` in `actions/triage/lib.mjs`) and sends that in the Approve header; the Worker
-verifies the signature and expiry (`verifyApprovalToken` in `backend/src/index.ts`) and dispatches
-only for the exact issue the token was minted against. A leaked token now buys, at most, one
-apply-fix replay on one issue, on one repo, for two days, not a standing credential.
-
-**Accepted:** the triage content itself (issue title, severity, proposed-fix summary) still goes
-out unauthenticated if the topic isn't access-controlled. Accepted as a lower-severity information
-disclosure (prose, not a credential); the README documents using a hard-to-guess topic slug or a
-self-hosted, access-controlled ntfy server for anyone who treats the triage detail as sensitive.
-`ntfy-token` authenticates the *publish* call to a self-hosted server but doesn't by itself prove
-reads are restricted; that ACL is the server operator's to configure and isn't something pr-goblin's
-client-side code can verify.
+**Accepted:** anyone who can read the notification topic within those 48 hours can approve that one ticket. Use a private, authenticated ntfy topic.

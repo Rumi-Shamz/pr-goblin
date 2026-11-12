@@ -170,9 +170,10 @@ const DEFAULTS: GoblinDaemonConfig = {
   polling: {
     intervalMs: 30_000,
   },
+  // The web dashboard is not shipped with pr-goblin; the local API stays available when enabled.
   dashboard: {
     port: 14500,
-    enabled: true,
+    enabled: false,
   },
   projects: [],
   policy: DEFAULT_POLICY,
