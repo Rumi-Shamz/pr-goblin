@@ -216,4 +216,40 @@ describe("Kernel runtime behavior", () => {
     expect(createCalls).toEqual([["TES-1", "/fake/repos/acme/app", "main"]])
     expect(kernel.getTask("issue-1")?.repo).toBe("acme/app")
   })
+
+  test("an agent that hits a usage limit is requeued for the reset without spending a retry, and dispatch pauses", async () => {
+    const { Kernel } = await import(`./kernel?usage-limit=${Date.now()}`)
+    const kernel = new Kernel(createSource(), createConfig(), KERNEL_CONFIG)
+    const now = new Date("2026-11-12T10:00:00Z")
+    kernel.now = () => now
+    let spawned = 0
+    ;(kernel as any).spawnAndAttach = async (): Promise<void> => { spawned++ }
+    ;(kernel as any).store.set(createTask({ state: "active", retryCount: 1 }))
+
+    const resetEpoch = Math.floor(now.getTime() / 1000) + 3 * 3600
+    await (kernel as any).onAgentExit("issue-1", {
+      exitCode: 1,
+      stderr: `Claude AI usage limit reached|${resetEpoch}`,
+    })
+
+    const task = kernel.getTask("issue-1")!
+    expect(task.state).toBe("queued")
+    expect(task.retryCount).toBe(1)
+    expect(new Date(task.retryAfter!).getTime()).toBeGreaterThanOrEqual(resetEpoch * 1000)
+    expect(kernel.usagePausedUntil).toBeGreaterThanOrEqual(resetEpoch * 1000)
+
+    // Another ticket arrives: nothing is dispatched while paused.
+    ;(kernel as any).store.set(createTask({ id: "issue-2", identifier: "TES-2" }))
+    await (kernel as any).dispatch()
+    expect(spawned).toBe(0)
+  })
+
+  test("an ordinary agent failure still spends a retry", async () => {
+    const { Kernel } = await import(`./kernel?ordinary-failure=${Date.now()}`)
+    const kernel = new Kernel(createSource(), createConfig(), KERNEL_CONFIG)
+    ;(kernel as any).store.set(createTask({ state: "active" }))
+    await (kernel as any).onAgentExit("issue-1", { exitCode: 1, stderr: "TypeError: x is undefined" })
+    expect(kernel.getTask("issue-1")!.retryCount).toBe(1)
+    expect(kernel.usagePausedUntil).toBeNull()
+  })
 })

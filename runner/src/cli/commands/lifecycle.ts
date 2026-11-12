@@ -5,6 +5,7 @@ import { resolve, dirname } from 'path'
 import { existsSync, readFileSync, openSync } from 'fs'
 import { loadConfig, getSettingsPath, loadSettings, settingsFromEnv } from '../../config'
 import { getRuntimeHealth } from '../../runtime-health'
+import { describeAgentAuth } from '../../agent/auth'
 import { printAnimatedBanner } from '../../kernel/banner'
 import { serveDashboard, installGracefulShutdown } from './runtime'
 import { readPid, writePid, removePid } from '../../daemon-pid'
@@ -31,6 +32,18 @@ const GOBLIN_ROOT = resolve(dirname(new URL(import.meta.url).pathname), '../../.
 function preflight(): { ready: boolean; issues: string[] } {
   const health = getRuntimeHealth({ ...loadSettings(), ...settingsFromEnv() })
   return { ready: health.runtimeReady, issues: health.issues }
+}
+
+/** Say which credentials each agent in use will run on, and warn about surprises. */
+export function printAgentAuth(config: ReturnType<typeof loadConfig>, write: (line: string) => void = console.log): void {
+  const agents = new Set<string>([config.agent.default, ...config.projects.map((p: { agent?: string }) => p.agent).filter(Boolean) as string[]])
+  agents.delete('auto')
+  if (agents.size === 0) agents.add('claude')
+  for (const agent of agents) {
+    const auth = describeAgentAuth(agent)
+    write(`goblin: ${auth.summary}`)
+    for (const w of auth.warnings) write(`goblin: warning: ${w}`)
+  }
 }
 
 async function printStartBanner(config: ReturnType<typeof loadConfig>): Promise<void> {
@@ -211,6 +224,7 @@ async function cmdRun(): Promise<void> {
     process.exit(1)
   }
 
+  printAgentAuth(config)
   const runtime = await createRuntimeKernel(config)
 
   if (config.dashboard.enabled) {
@@ -363,6 +377,7 @@ async function cmdOnce(opts: { timeout?: string; json?: boolean }): Promise<void
   const minutes = Number(opts.timeout)
   const deadlineMs = Number.isFinite(minutes) && minutes > 0 ? minutes * 60_000 : undefined
 
+  if (!opts.json) printAgentAuth(config)
   const runtime = await createRuntimeKernel({
     ...config,
     dashboard: { ...config.dashboard, enabled: false },
@@ -378,6 +393,7 @@ async function cmdOnce(opts: { timeout?: string; json?: boolean }): Promise<void
     }
     if (summary.held > 0) console.log(`goblin: ${summary.held} untrusted ticket(s) waiting for human triage`)
     if (summary.batchWaiting > 0) console.log(`goblin: ${summary.batchWaiting} batch ticket(s) waiting for the batch window`)
+    if (summary.usageLimitedUntil) console.log(`goblin: agent usage limit reached; tickets stay queued and are picked up by a run after ${summary.usageLimitedUntil}`)
     if (summary.timedOut) console.error('goblin: timed out before all agents finished')
   }
 

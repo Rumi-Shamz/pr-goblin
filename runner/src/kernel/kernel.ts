@@ -1,6 +1,7 @@
 // kernel.ts — core: state machine + dispatch loop
 // Calls atomic primitives (Workspace, Publish, Source, agent) directly.
 
+import { detectUsageLimit, type UsageLimit } from '../agent/usage-limit';
 import type {
   Task,
   TaskState,
@@ -119,6 +120,8 @@ export class Kernel {
   private policy: PolicyConfig;
   /** Counts from the last poll, for status output. */
   lastAdmission = { held: 0, batchWaiting: 0 };
+  /** Set when an agent reports a usage or rate limit: nothing is dispatched before it. */
+  usagePausedUntil: number | null = null;
   /** Clock, overridable in tests. */
   now: () => Date = () => new Date();
 
@@ -250,6 +253,7 @@ export class Kernel {
     held: number;
     batchWaiting: number;
     timedOut: boolean;
+    usageLimitedUntil?: string;
   }> {
     const deadline = Date.now() + (opts.deadlineMs ?? this.kernelConfig.turnTimeoutMs);
     const pollMs = opts.pollMs ?? 2000;
@@ -273,6 +277,8 @@ export class Kernel {
       const queued = this.store.byState('queued');
       if (!busy && queued.length === 0) break;
       if (!busy && queued.every((t) => t.retryAfter && new Date(t.retryAfter).getTime() > deadline)) break;
+      // Out of quota until after this run ends: stop now instead of idling to the deadline.
+      if (!busy && this.usagePausedUntil !== null && this.usagePausedUntil > deadline) break;
       if (Date.now() > deadline) {
         timedOut = true;
         break;
@@ -297,7 +303,11 @@ export class Kernel {
             : t.state,
         prUrl: t.prUrl,
       }));
-    return { worked, ...this.lastAdmission, timedOut };
+    const usageLimitedUntil =
+      this.usagePausedUntil !== null && this.usagePausedUntil > this.now().getTime()
+        ? new Date(this.usagePausedUntil).toISOString()
+        : undefined;
+    return { worked, ...this.lastAdmission, timedOut, ...(usageLimitedUntil ? { usageLimitedUntil } : {}) };
   }
 
   /**
@@ -487,6 +497,10 @@ export class Kernel {
   }
 
   private async dispatch(): Promise<void> {
+    if (this.usagePausedUntil !== null) {
+      if (this.now().getTime() < this.usagePausedUntil) return;
+      this.usagePausedUntil = null;
+    }
     const now = Date.now();
     const queued = this.store
       .byState('queued')
@@ -602,6 +616,12 @@ export class Kernel {
 
     // Gate: agent must exit 0
     if (result.exitCode !== 0) {
+      const limit = detectUsageLimit(result.stderr, this.now());
+      if (limit) {
+        enrichMeta(task, result, 'usage limit');
+        syncHistoryIndexForTask(sanitizeTaskIdentifier(task.identifier));
+        return this.pauseForUsageLimit(task, limit);
+      }
       const reason = `agent exited ${result.exitCode}`;
       this.log.event(taskId, task.identifier, 'gate_failed', { reason });
       enrichMeta(task, result, reason);
@@ -903,6 +923,26 @@ export class Kernel {
     this.store.set(task);
     this.store.save();
     handle.done.then((result) => this.onAgentExit(task.id, result));
+  }
+
+  /**
+   * The agent ran out of quota (subscription cap or API rate limit). The ticket
+   * is not at fault: requeue it for after the reset without spending a retry,
+   * and hold all dispatch until then, since every agent would hit the same limit.
+   */
+  private async pauseForUsageLimit(task: Task, limit: UsageLimit): Promise<void> {
+    const until = limit.resetAt.getTime();
+    this.usagePausedUntil = Math.max(this.usagePausedUntil ?? 0, until);
+    task.retryAfter = limit.resetAt.toISOString();
+    console.warn(
+      `[kernel] ${task.identifier}: agent hit a usage limit (${limit.message}). Pausing until ${limit.resetAt.toLocaleString()}.`,
+    );
+    this.log.event(task.id, task.identifier, 'usage_limited', {
+      message: limit.message,
+      retryAfter: task.retryAfter,
+    });
+    this.emit({ type: 'usage_limited', task, data: { retryAfter: task.retryAfter, message: limit.message } });
+    return this.transition(task, 'queued');
   }
 
   /** Retry a task with exponential backoff, or fail if max retries exceeded. */

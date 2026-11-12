@@ -14,6 +14,7 @@ import { parseClaudeLine } from './claude-parser';
 import { collectStderr, killProcessTree } from './process-utils';
 import { noopLogger } from './types';
 import { spawnPath } from '../utils/path';
+import { agentEnv } from './auth';
 import type {
   ACPEvent,
   AgentEventHandler,
@@ -28,6 +29,7 @@ async function parseStream(
   identifier: string,
   log: RunnerLogger,
   sessionLogPath: string,
+  errorBuffer: { text: string },
 ): Promise<void> {
   const reader = stream.getReader();
   const decoder = new TextDecoder();
@@ -41,6 +43,11 @@ async function parseStream(
         appendFileSync(sessionLogPath, `${line}\n`);
       } catch (err) {
         log.warn({ err, identifier }, 'Failed to append claude session log');
+      }
+      // A failed run reports why in its result line, not on stderr (usage
+      // limits among them). Keep it where the kernel looks for exit reasons.
+      if (raw?.type === 'result' && raw.is_error && typeof raw.result === 'string') {
+        errorBuffer.text += `${errorBuffer.text ? '\n' : ''}${raw.result}`;
       }
       for (const event of parseClaudeLine(raw)) {
         onEvent(event);
@@ -110,7 +117,7 @@ export const claudeBackend: AgentBackend = {
       stderr: 'pipe',
       cwd: workDir,
       env: {
-        ...process.env,
+        ...agentEnv('claude', process.env),
         ...(options.sandbox?.env ?? {}),
         PATH: spawnPath(),
       },
@@ -129,6 +136,7 @@ export const claudeBackend: AgentBackend = {
       task.identifier,
       log,
       sessionLogPath,
+      stderrBuffer,
     );
 
     collectStderr(proc.stderr, stderrBuffer, task.identifier, 'claude', log);
