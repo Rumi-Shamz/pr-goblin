@@ -1,5 +1,5 @@
 import { captureContext } from './context.js'
-import { captureScreenshot } from './screenshot.js'
+import { captureScreenshot, applyRedactions, boxFromPoints } from './screenshot.js'
 import cssText from './styles.css?inline'
 import { resolveIcon } from './icon.js'
 import { DragTracker, SIDES, defaultY, readDock, writeDock } from './dock.js'
@@ -31,6 +31,11 @@ export class PrGoblinWidget {
       // false hides the screenshot option, for apps whose pages show data that
       // must not leave in an image.
       screenshot: true,
+      // What the screenshot hides: 'fields' (form values, the default), 'all'
+      // (all text and images too, leaving the layout) or 'none'. Elements matching
+      // maskSelectors, data-goblin-mask, data-private and similar are always hidden.
+      mask: 'fields',
+      maskSelectors: [],
       theme: 'auto',
       ...config,
     }
@@ -46,6 +51,7 @@ export class PrGoblinWidget {
     if (!SIDES.has(this._cfg.side)) this._cfg.side = 'right'
     this._type = 'bug'
     this._screenshot = null
+    this._redactions = []
     this._submitting = false
     this._autoCloseTimer = null
     this._inject()
@@ -183,6 +189,10 @@ export class PrGoblinWidget {
     // Common refs
     this._screenshotPreview = this._dialog.querySelector('#bp-screenshot-preview')
     this._captureBtn        = this._dialog.querySelector('#bp-capture-btn')
+    this._shotEl            = this._dialog.querySelector('#bp-shot')
+    this._shotBoxesEl       = this._dialog.querySelector('#bp-shot-boxes')
+    this._shotHelpEl        = this._dialog.querySelector('#bp-shot-help')
+    this._redactUndoBtn     = this._dialog.querySelector('#bp-redact-undo')
     this._submitBtn         = this._dialog.querySelector('#bp-submit-btn')
     this._statusEl          = this._dialog.querySelector('#bp-status')
 
@@ -369,7 +379,14 @@ export class PrGoblinWidget {
           <div class="bp-screenshot-row">
             <button class="bp-btn-ghost" id="bp-capture-btn" type="button">Capture screenshot</button>
           </div>
-          <img class="bp-screenshot-preview" id="bp-screenshot-preview" alt="Screenshot preview" />
+          <div class="bp-shot" id="bp-shot">
+            <img class="bp-screenshot-preview" id="bp-screenshot-preview" alt="Screenshot preview" draggable="false" />
+            <div class="bp-shot-boxes" id="bp-shot-boxes"></div>
+          </div>
+          <div class="bp-shot-help" id="bp-shot-help">
+            <span>Drag over the screenshot to black out anything private.</span>
+            <button class="bp-link-btn" id="bp-redact-undo" type="button" disabled>Undo</button>
+          </div>
         </div>`}
         <div class="bp-field">
           <span class="bp-label">Context</span>
@@ -441,9 +458,12 @@ export class PrGoblinWidget {
           this._dialog,
           this._backdrop,
           this._trigger,
-        ])
+        ], { mask: this._cfg.mask, maskSelectors: this._cfg.maskSelectors })
+        this._setRedactions([])
         this._screenshotPreview.src = this._screenshot
         this._screenshotPreview.classList.add('bp-visible')
+        this._shotEl.classList.add('bp-visible')
+        this._shotHelpEl.classList.add('bp-visible')
         this._captureBtn.textContent = 'Retake screenshot'
       } catch (err) {
         this._captureBtn.textContent = 'Capture failed — retry'
@@ -452,6 +472,8 @@ export class PrGoblinWidget {
         this._captureBtn.disabled = false
       }
     })
+
+    this._bindRedaction()
 
     this._submitBtn.addEventListener('click', () => this._submit())
 
@@ -469,6 +491,72 @@ export class PrGoblinWidget {
     this._submitBtn.disabled = !ready || this._submitting
   }
 
+  // --- Reporter redaction: drag boxes over the screenshot preview ---------
+
+  _bindRedaction() {
+    const area = this._shotEl
+    if (!area) return
+    let start = null
+    let draft = null
+    const point = (e) => ({ x: e.clientX, y: e.clientY })
+    area.addEventListener('pointerdown', (e) => {
+      if (!this._screenshot) return
+      e.preventDefault()
+      start = point(e)
+      draft = document.createElement('div')
+      draft.className = 'bp-shot-box'
+      this._shotBoxesEl.appendChild(draft)
+      area.setPointerCapture?.(e.pointerId)
+    })
+    area.addEventListener('pointermove', (e) => {
+      if (!start) return
+      this._placeBox(draft, boxFromPoints(area.getBoundingClientRect(), start, point(e)))
+    })
+    const finish = (e) => {
+      if (!start) return
+      const box = boxFromPoints(area.getBoundingClientRect(), start, point(e))
+      start = null
+      draft?.remove()
+      draft = null
+      // Ignore clicks; keep real drags.
+      if (box.w > 0.01 && box.h > 0.01) this._setRedactions([...this._redactions, box])
+    }
+    area.addEventListener('pointerup', finish)
+    area.addEventListener('pointercancel', () => { start = null; draft?.remove(); draft = null })
+    this._redactUndoBtn.addEventListener('click', () => this._setRedactions(this._redactions.slice(0, -1)))
+  }
+
+  _placeBox(el, box) {
+    el.style.left = `${box.x * 100}%`
+    el.style.top = `${box.y * 100}%`
+    el.style.width = `${box.w * 100}%`
+    el.style.height = `${box.h * 100}%`
+  }
+
+  _setRedactions(boxes) {
+    this._redactions = boxes
+    if (!this._shotBoxesEl) return
+    this._shotBoxesEl.replaceChildren(...boxes.map((b) => {
+      const el = document.createElement('div')
+      el.className = 'bp-shot-box'
+      this._placeBox(el, b)
+      return el
+    }))
+    this._redactUndoBtn.disabled = boxes.length === 0
+  }
+
+  /** The screenshot to send, with the reporter's boxes painted in. Never an unredacted image when boxes were drawn. */
+  async _outgoingScreenshot() {
+    if (this._cfg.screenshot === false || !this._screenshot) return null
+    if (!this._redactions.length) return this._screenshot
+    try {
+      return await applyRedactions(this._screenshot, this._redactions)
+    } catch (err) {
+      console.error('[pr-goblin] could not black out the screenshot; sending without it', err)
+      return null
+    }
+  }
+
   async _submit() {
     if (this._submitting) return
     this._submitting = true
@@ -482,7 +570,7 @@ export class PrGoblinWidget {
     if (this._capture && this._type === 'bug') ctx.logs = this._capture.entries()
     const base = {
       type: this._type,
-      screenshot: this._cfg.screenshot === false ? null : this._screenshot,
+      screenshot: await this._outgoingScreenshot(),
       context: ctx,
       projectName: this._cfg.projectName || document.title,
       user: this._user,
@@ -568,9 +656,12 @@ export class PrGoblinWidget {
     this._featureWhyEl.value = ''
     this._featurePriorityEl.value = 'critical'
     this._screenshot = null
+    this._setRedactions([])
     if (this._screenshotPreview) {
       this._screenshotPreview.src = ''
       this._screenshotPreview.classList.remove('bp-visible')
+      this._shotEl.classList.remove('bp-visible')
+      this._shotHelpEl.classList.remove('bp-visible')
     }
     if (this._captureBtn) this._captureBtn.textContent = 'Capture screenshot'
     this._updateSubmit()
