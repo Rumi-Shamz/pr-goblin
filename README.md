@@ -110,6 +110,8 @@ Deploy the endpoint, then load the widget:
 </script>
 ```
 
+The widget takes on the look of the page it is on. At start-up, and again each time the dialog opens or the page switches between light and dark, it reads the page's brand colour, background, text colour, font and corner radius — from design tokens such as `--primary` and `--radius` (shadcn/ui, Bootstrap, MUI, Mantine and similar) or, failing that, from the page's own buttons. Any `--bp-*` variable you set in your own CSS is left alone, `color: '#rrggbb'` still pins the brand colour, and `theme: 'none'` turns the behaviour off.
+
 Build the widget with `cd widget && pnpm install && pnpm build`. Pass `captureLogs: false` to turn off console and network error capture. Captured URLs have their query strings removed, and request and response bodies are never read.
 
 **Intake as a Node server**

@@ -6,6 +6,7 @@ import { DragTracker, SIDES, defaultY, readDock, writeDock } from './dock.js'
 import { sanitiseUser } from './user.js'
 import { LogCapture } from './capture.js'
 import { parseRgbString, computeHoverRgb } from './colour.js'
+import { detectTheme } from './theme.js'
 
 const BUG_CATEGORIES = [
   'UI / Visual issue',
@@ -27,6 +28,7 @@ export class PrGoblinWidget {
       icon: null,
       user: null,
       captureLogs: true,
+      theme: 'auto',
       ...config,
     }
     this._user = sanitiseUser(this._cfg.user)
@@ -45,7 +47,9 @@ export class PrGoblinWidget {
     this._autoCloseTimer = null
     this._inject()
     this._render()
+    this._applyTheme()
     this._applyColor()
+    this._watchTheme()
     this._bind()
   }
 
@@ -55,6 +59,40 @@ export class PrGoblinWidget {
     style.id = 'bp-styles'
     style.textContent = cssText
     document.head.appendChild(style)
+  }
+
+  // Auto-theme (theme.js): copy the host page's colours, font and corner
+  // radius onto the widget. `theme: 'none'` keeps the stylesheet defaults.
+  // Runs before _applyColor so an explicit `color` still has the last word.
+  _applyTheme() {
+    if (this._cfg.theme === 'none') return
+    const vars = detectTheme(document, { color: this._cfg.color })
+    const els = [this._trigger, this._dialog, this._backdrop]
+    for (const name of this._themedVars || []) {
+      if (!(name in vars)) for (const el of els) el.style.removeProperty(name)
+    }
+    for (const [name, value] of Object.entries(vars)) {
+      for (const el of els) el.style.setProperty(name, value)
+    }
+    this._themedVars = Object.keys(vars)
+  }
+
+  // Follow light/dark switches: most apps flip a class or data attribute on
+  // <html> or <body>, or follow the OS setting.
+  _watchTheme() {
+    if (this._cfg.theme === 'none') return
+    this._retheme = () => {
+      this._applyTheme()
+      this._applyColor()
+    }
+    if (typeof MutationObserver !== 'undefined') {
+      this._themeObserver = new MutationObserver(this._retheme)
+      const opts = { attributes: true, attributeFilter: ['class', 'style', 'data-theme', 'data-mode', 'data-color-scheme', 'data-bs-theme'] }
+      this._themeObserver.observe(document.documentElement, opts)
+      this._themeObserver.observe(document.body, opts)
+    }
+    this._schemeQuery = window.matchMedia?.('(prefers-color-scheme: dark)') || null
+    this._schemeQuery?.addEventListener?.('change', this._retheme)
   }
 
   _applyColor() {
@@ -535,6 +573,8 @@ export class PrGoblinWidget {
 
   open() {
     this._isOpen = true
+    // Styles may have loaded, or the page restyled itself, since init.
+    this._retheme?.()
     this._dialog.classList.add('bp-visible')
     this._backdrop.classList.add('bp-visible')
     const firstField = this._type === 'bug' ? this._whatHappenedEl : this._featureAskEl
@@ -552,6 +592,8 @@ export class PrGoblinWidget {
 
   destroy() {
     this._capture?.uninstall()
+    this._themeObserver?.disconnect()
+    this._schemeQuery?.removeEventListener?.('change', this._retheme)
     document.removeEventListener('keydown', this._onKeydown)
     if (this._onResize) window.removeEventListener('resize', this._onResize)
     this._trigger?.remove()
