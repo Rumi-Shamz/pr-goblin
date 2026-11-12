@@ -252,4 +252,41 @@ describe("Kernel runtime behavior", () => {
     expect(kernel.getTask("issue-1")!.retryCount).toBe(1)
     expect(kernel.usagePausedUntil).toBeNull()
   })
+
+  test("a continuation is not spawned during a usage pause: the task is requeued without spending a round", async () => {
+    const { Kernel } = await import(`./kernel?continuation-pause=${Date.now()}`)
+    const source = { ...createSource(), fetchDisposition: async () => "actionable" as const }
+    const kernel = new Kernel(source, createConfig(), KERNEL_CONFIG)
+    const now = new Date("2026-11-12T10:00:00Z")
+    kernel.now = () => now
+    kernel.usagePausedUntil = now.getTime() + 3600_000
+    let spawned = 0
+    ;(kernel as any).spawnAndAttach = async (): Promise<void> => { spawned++ }
+    ;(kernel as any).store.set(createTask({ state: "active", round: 1, agent: "claude", workDir: "/tmp/w", worktree: "/tmp/w/repo" }))
+
+    await (kernel as any).tryContinuation(kernel.getTask("issue-1"), { exitCode: 0, stderr: "" })
+
+    const task = kernel.getTask("issue-1")!
+    expect(spawned).toBe(0)
+    expect(task.state).toBe("queued")
+    expect(task.round).toBe(1)
+    expect(task.retryCount).toBe(0)
+  })
+
+  test("reDispatch waits out a usage pause without spending a round", async () => {
+    const { Kernel } = await import(`./kernel?redispatch-pause=${Date.now()}`)
+    const kernel = new Kernel(createSource(), createConfig(), KERNEL_CONFIG)
+    const now = new Date("2026-11-12T10:00:00Z")
+    kernel.now = () => now
+    kernel.usagePausedUntil = now.getTime() + 3600_000
+    let spawned = 0
+    ;(kernel as any).spawnAndAttach = async (): Promise<void> => { spawned++ }
+    ;(kernel as any).store.set(createTask({ state: "published", round: 1, agent: "claude", workDir: "/tmp/w", worktree: "/tmp/w/repo" }))
+
+    await (kernel as any).reDispatch(kernel.getTask("issue-1"))
+
+    expect(spawned).toBe(0)
+    expect(kernel.getTask("issue-1")!.state).toBe("published")
+    expect(kernel.getTask("issue-1")!.round).toBe(1)
+  })
 })

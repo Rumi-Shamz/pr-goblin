@@ -37,6 +37,8 @@ function maskBox(el) {
   for (const child of el.querySelectorAll('*')) {
     child.style.setProperty('color', 'transparent', 'important')
     child.style.setProperty('text-shadow', 'none', 'important')
+    // CSS backgrounds are images too (avatars, charts, sprites).
+    child.style.setProperty('background-image', 'none', 'important')
     if (child.matches(MEDIA)) child.style.setProperty('visibility', 'hidden', 'important')
   }
   if (el.matches(MEDIA)) {
@@ -81,6 +83,10 @@ export function maskDocument(doc, { mask = 'fields', maskSelectors = [] } = {}) 
   if (mask === 'all') {
     scrambleText(doc.body)
     doc.body.querySelectorAll(MEDIA).forEach(maskBox)
+    // CSS background images, on every element including body.
+    for (const el of [doc.body, ...doc.body.querySelectorAll('*')]) {
+      el.style.setProperty('background-image', 'none', 'important')
+    }
   }
 }
 
@@ -134,12 +140,12 @@ export async function applyRedactions(dataUrl, boxes, timeoutMs = 3000) {
   ctx.drawImage(img, 0, 0)
   ctx.fillStyle = '#000'
   for (const b of boxes) {
-    ctx.fillRect(
-      Math.floor(b.x * canvas.width),
-      Math.floor(b.y * canvas.height),
-      Math.ceil(b.w * canvas.width),
-      Math.ceil(b.h * canvas.height),
-    )
+    // Round both edges outward so no strip of the chosen area is left uncovered.
+    const x0 = Math.floor(b.x * canvas.width)
+    const y0 = Math.floor(b.y * canvas.height)
+    const x1 = Math.ceil((b.x + b.w) * canvas.width)
+    const y1 = Math.ceil((b.y + b.h) * canvas.height)
+    ctx.fillRect(x0, y0, x1 - x0, y1 - y0)
   }
   return canvas.toDataURL('image/png')
 }

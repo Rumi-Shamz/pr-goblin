@@ -75,9 +75,12 @@ export function parseResetTime(line: string, now: Date): Date | null {
     if (ms > 0) return new Date(now.getTime() + ms)
   }
 
-  // "resets 3pm", "resets at 3:30 PM", "try again at 15:00". Read in local time;
-  // a time already past today means tomorrow. A named day ("resets Mon 9am") is
-  // not parsed, and falls back to the default pause, which simply checks again.
+  // "resets 3pm", "resets at 3:30 PM", "try again at 15:00", optionally with a
+  // zone: "resets 9am (America/Los_Angeles)". A stated zone is honoured; a zone
+  // we cannot read gives null (the default pause) rather than a wrong guess.
+  // Without a zone the time is local: the agent prints it in the zone of the
+  // machine it runs on, which is this one. A named day ("resets Mon 9am") is
+  // not parsed and falls back to the default pause, which simply checks again.
   const clock = line.match(/(?:resets?|try again)\s+(?:at\s+)?(\d{1,2})(?::(\d{2}))?\s*(am|pm)?\b/i)
   if (clock && (clock[2] || clock[3])) {
     let hour = Number(clock[1])
@@ -86,10 +89,47 @@ export function parseResetTime(line: string, now: Date): Date | null {
     if (meridiem === 'pm' && hour < 12) hour += 12
     if (meridiem === 'am' && hour === 12) hour = 0
     if (hour > 23 || minute > 59) return null
+
+    const zone = line.slice((clock.index ?? 0) + clock[0].length).match(/^\s*\(([^)]+)\)/)?.[1]?.trim()
+    if (zone) return nextWallClockInZone(now, hour, minute, zone)
+
     const at = new Date(now)
     at.setHours(hour, minute, 0, 0)
     if (at.getTime() <= now.getTime()) at.setDate(at.getDate() + 1)
     return at
+  }
+  return null
+}
+
+/** Offset (ms) of `zone` from UTC at `instant`, or null for an unknown zone. */
+function zoneOffset(instant: Date, zone: string): number | null {
+  let parts: Intl.DateTimeFormatPart[]
+  try {
+    parts = new Intl.DateTimeFormat('en-US', {
+      timeZone: zone, hourCycle: 'h23',
+      year: 'numeric', month: 'numeric', day: 'numeric', hour: 'numeric', minute: 'numeric', second: 'numeric',
+    }).formatToParts(instant)
+  } catch {
+    return null
+  }
+  const get = (t: string) => Number(parts.find((p) => p.type === t)?.value)
+  const wall = Date.UTC(get('year'), get('month') - 1, get('day'), get('hour'), get('minute'), get('second'))
+  return wall - Math.floor(instant.getTime() / 1000) * 1000
+}
+
+/** The next instant after `now` at which the wall clock in `zone` reads hour:minute. */
+export function nextWallClockInZone(now: Date, hour: number, minute: number, zone: string): Date | null {
+  const offsetNow = zoneOffset(now, zone)
+  if (offsetNow === null) return null
+  // Today's date as seen in that zone.
+  const local = new Date(now.getTime() + offsetNow)
+  for (let addDays = 0; addDays <= 1; addDays++) {
+    const wall = Date.UTC(local.getUTCFullYear(), local.getUTCMonth(), local.getUTCDate() + addDays, hour, minute)
+    // Convert wall time to an instant; correct once for a DST change between now and then.
+    let at = wall - offsetNow
+    const offsetThen = zoneOffset(new Date(at), zone)
+    if (offsetThen !== null && offsetThen !== offsetNow) at = wall - offsetThen
+    if (at > now.getTime()) return new Date(at)
   }
   return null
 }

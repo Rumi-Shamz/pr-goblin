@@ -281,6 +281,7 @@ async function cmdDaemon(): Promise<void> {
           if (!ready) {
             throw new Error(`Setup incomplete: ${issues.join(', ')}`)
           }
+          printAgentAuth(nextConfig)
           const nextRuntime = await createRuntimeKernel(nextConfig)
           await nextRuntime.kernel.start()
           runtime = nextRuntime
@@ -303,6 +304,7 @@ async function cmdDaemon(): Promise<void> {
   // If setup was already complete at fork time, start polling immediately.
   if (runtime && preflight().ready) {
     await printStartBanner(config)
+    printAgentAuth(config)
     await runtime.kernel.start()
   }
 

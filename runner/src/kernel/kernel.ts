@@ -496,11 +496,16 @@ export class Kernel {
     this.attachAgent(task, handle);
   }
 
+  /** True while an agent-reported usage limit is in force; clears an expired one. */
+  private usagePaused(): boolean {
+    if (this.usagePausedUntil === null) return false;
+    if (this.now().getTime() < this.usagePausedUntil) return true;
+    this.usagePausedUntil = null;
+    return false;
+  }
+
   private async dispatch(): Promise<void> {
-    if (this.usagePausedUntil !== null) {
-      if (this.now().getTime() < this.usagePausedUntil) return;
-      this.usagePausedUntil = null;
-    }
+    if (this.usagePaused()) return;
     const now = Date.now();
     const queued = this.store
       .byState('queued')
@@ -512,6 +517,8 @@ export class Kernel {
     for (const task of queued) {
       // Concurrency cap: leave the rest queued for a later tick.
       if (limit > 0 && this.store.byState('active').length >= limit) break;
+      // An agent may have reported a limit while an earlier iteration awaited.
+      if (this.usagePaused()) break;
       try {
         this.log.event(task.id, task.identifier, 'dispatch_start');
 
@@ -541,6 +548,9 @@ export class Kernel {
 
         // Resolve agent name
         const resolvedAgent = project?.agent ?? task.agent ?? this.kernelConfig.agentDefault;
+
+        // Workspace setup awaited; a limit may have been reported meanwhile. Leave it queued.
+        if (this.usagePaused()) break;
 
         // Project setup — user-supplied shell, a system boundary.
         // Failures surface to stderr but don't abort dispatch.
@@ -761,6 +771,8 @@ export class Kernel {
    * Kernel only provides budget context.
    */
   private async reDispatch(task: Task): Promise<void> {
+    // Out of quota: leave it published; reconcile asks again after the reset.
+    if (this.usagePaused()) return;
     if (task.round >= task.maxRounds) {
       this.log.event(task.id, task.identifier, 'max_rounds_reached', {
         round: task.round,
@@ -817,6 +829,9 @@ export class Kernel {
       return this.transition(task, 'published');
     }
 
+    // Out of quota: requeue for after the reset, without spending a round or a retry.
+    if (this.usagePaused()) return this.requeueUntilUsageReset(task);
+
     // Schedule continuation via reDispatch-like logic
     task.round++;
     this.log.event(task.id, task.identifier, 'continuation_scheduled', {
@@ -828,6 +843,11 @@ export class Kernel {
 
     // Both workDir and worktree must exist
     if (!task.workDir || !task.worktree) return this.transition(task, 'done', 'failed');
+
+    if (this.usagePaused()) {
+      task.round--;
+      return this.requeueUntilUsageReset(task);
+    }
 
     try {
       if (!task.agent) throw new Error(`invariant: task ${task.identifier} has no resolved agent at continuation`);
@@ -942,6 +962,12 @@ export class Kernel {
       retryAfter: task.retryAfter,
     });
     this.emit({ type: 'usage_limited', task, data: { retryAfter: task.retryAfter, message: limit.message } });
+    return this.transition(task, 'queued');
+  }
+
+  private async requeueUntilUsageReset(task: Task): Promise<void> {
+    task.retryAfter = new Date(this.usagePausedUntil ?? this.now().getTime()).toISOString();
+    this.log.event(task.id, task.identifier, 'usage_paused_requeue', { retryAfter: task.retryAfter });
     return this.transition(task, 'queued');
   }
 

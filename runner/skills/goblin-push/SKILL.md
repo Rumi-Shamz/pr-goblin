@@ -30,9 +30,12 @@ Check if a PR already exists:
 pr_url=$(gh pr view --json url -q .url 2>/dev/null || true)
 ```
 
-**No existing PR** — create one. Always pass `--base` with the base branch named
-under "Base Branch" in your CLAUDE.md / AGENTS.md (`main` if none is named);
-without it the PR targets the repository's default branch, which may be wrong.
+Every `gh pr create` below must pass `--base` with the base branch named under
+"Base Branch" in your CLAUDE.md / AGENTS.md (`main` if none is named); without it
+the PR targets the repository's default branch, which may be wrong. Set it in
+the same block that creates the PR, since each block may run in a fresh shell.
+
+**No existing PR** — create one.
 
 ```sh
 BASE=main   # replace with the base branch from your CLAUDE.md
@@ -61,6 +64,7 @@ gh pr edit --title "ISSUE-ID: <updated title if scope changed>"
 **PR exists but closed/merged** — you need a new branch:
 
 ```sh
+BASE=main   # replace with the base branch from your CLAUDE.md
 git checkout -b <new-branch-name>
 git push -u origin HEAD
 gh pr create --base "$BASE" --title "..." --body-file /tmp/pr-body.md

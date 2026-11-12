@@ -18,8 +18,10 @@ on:
 permissions:
   contents: write
 
+# One run per tag, so a release waiting behind another is never cancelled.
+# The major-tag step below is safe when two releases run at once.
 concurrency:
-  group: release
+  group: release-${{ github.ref }}
   cancel-in-progress: false
 
 jobs:
@@ -79,7 +81,15 @@ jobs:
             "pr-goblin-intake-node-${GITHUB_REF_NAME}.mjs"
 
       - name: Move the major tag
+        # Only when this is the newest release of its major version, so a later
+        # maintenance release (v0.1.1 after v0.2.0) never moves v0 backwards.
         run: |
           major="${GITHUB_REF_NAME%%.*}"
+          git fetch --force --tags origin
+          newest=$(git tag -l "$major.*.*" | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | sort -V | tail -1)
+          if [ "$newest" != "$GITHUB_REF_NAME" ]; then
+            echo "$GITHUB_REF_NAME is not the newest $major release ($newest); leaving $major where it is"
+            exit 0
+          fi
           git tag -f "$major" "$GITHUB_SHA"
           git push -f origin "refs/tags/$major"

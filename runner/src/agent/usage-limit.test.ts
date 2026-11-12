@@ -17,11 +17,26 @@ describe("detectUsageLimit", () => {
     expect(limit.resetAt.getTime()).toBe(epoch * 1000 + 60_000)
   })
 
-  test("reads a clock reset, rolling to tomorrow when it has passed", () => {
+  test("reads a clock reset without a zone as local, rolling to tomorrow when it has passed", () => {
     expect(detectUsageLimit("5-hour limit reached ∙ resets 3pm", NOW)!.resetAt.getHours()).toBe(15)
-    const tomorrow = parseResetTime("You've hit your limit · resets 9am (Europe/London)", NOW)!
+    const tomorrow = parseResetTime("You've hit your limit · resets 9am", NOW)!
     expect(tomorrow.getDate()).toBe(13)
     expect(tomorrow.getHours()).toBe(9)
+  })
+
+  test("reads a clock reset in the zone the message states", () => {
+    const utcNow = new Date("2026-11-12T10:00:00Z")
+    // 09:00 in Los Angeles (UTC-8 in November) is 17:00 UTC, still ahead today.
+    expect(parseResetTime("You've hit your limit · resets 9am (America/Los_Angeles)", utcNow)!.toISOString()).toBe("2026-11-12T17:00:00.000Z")
+    // 09:00 in London (UTC+0) has passed: tomorrow.
+    expect(parseResetTime("resets 9am (Europe/London)", utcNow)!.toISOString()).toBe("2026-11-13T09:00:00.000Z")
+    // 3:30pm in Tokyo (UTC+9) is 06:30 UTC, passed today: tomorrow.
+    expect(parseResetTime("resets 3:30pm (Asia/Tokyo)", utcNow)!.toISOString()).toBe("2026-11-13T06:30:00.000Z")
+  })
+
+  test("an unreadable zone falls back to the default pause", () => {
+    expect(parseResetTime("resets 9am (Mars/Olympus)", NOW)).toBeNull()
+    expect(detectUsageLimit("You've hit your limit · resets 9am (Mars/Olympus)", NOW)!.resetAt.getTime() - NOW.getTime()).toBe(30 * 60_000)
   })
 
   test("reads a relative reset (Codex)", () => {

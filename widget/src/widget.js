@@ -496,12 +496,18 @@ export class PrGoblinWidget {
   _bindRedaction() {
     const area = this._shotEl
     if (!area) return
+    // One pointer owns a drag; a second finger is ignored until it ends, so a
+    // drawn box can never be left on screen without being recorded.
     let start = null
     let draft = null
+    let pointerId = null
     const point = (e) => ({ x: e.clientX, y: e.clientY })
+    const mine = (e) => start !== null && e.pointerId === pointerId
+    const clear = () => { start = null; pointerId = null; draft?.remove(); draft = null }
     area.addEventListener('pointerdown', (e) => {
-      if (!this._screenshot) return
+      if (!this._screenshot || start !== null) return
       e.preventDefault()
+      pointerId = e.pointerId
       start = point(e)
       draft = document.createElement('div')
       draft.className = 'bp-shot-box'
@@ -509,20 +515,18 @@ export class PrGoblinWidget {
       area.setPointerCapture?.(e.pointerId)
     })
     area.addEventListener('pointermove', (e) => {
-      if (!start) return
+      if (!mine(e)) return
       this._placeBox(draft, boxFromPoints(area.getBoundingClientRect(), start, point(e)))
     })
     const finish = (e) => {
-      if (!start) return
+      if (!mine(e)) return
       const box = boxFromPoints(area.getBoundingClientRect(), start, point(e))
-      start = null
-      draft?.remove()
-      draft = null
+      clear()
       // Ignore clicks; keep real drags.
       if (box.w > 0.01 && box.h > 0.01) this._setRedactions([...this._redactions, box])
     }
     area.addEventListener('pointerup', finish)
-    area.addEventListener('pointercancel', () => { start = null; draft?.remove(); draft = null })
+    area.addEventListener('pointercancel', (e) => { if (mine(e)) clear() })
     this._redactUndoBtn.addEventListener('click', () => this._setRedactions(this._redactions.slice(0, -1)))
   }
 

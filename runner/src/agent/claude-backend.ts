@@ -125,7 +125,7 @@ export const claudeBackend: AgentBackend = {
 
     let latestUsage: ACPEvent['usage'] | undefined;
 
-    parseStream(
+    const stdoutDone = parseStream(
       proc.stdout,
       (event) => {
         if (event.type === 'usage' && event.usage) {
@@ -139,9 +139,16 @@ export const claudeBackend: AgentBackend = {
       stderrBuffer,
     );
 
-    collectStderr(proc.stderr, stderrBuffer, task.identifier, 'claude', log);
+    const stderrDone = collectStderr(proc.stderr, stderrBuffer, task.identifier, 'claude', log);
 
-    const done = proc.exited.then((code) => {
+    // The exit reason (a usage limit, for one) is in the last stdout line, so
+    // read both streams to the end before reporting the exit. A grandchild
+    // that keeps a pipe open must not hold the task forever: give up after a
+    // short grace period.
+    const STREAM_GRACE_MS = 5_000;
+    const streamsDone = Promise.all([stdoutDone, stderrDone]);
+    const done = proc.exited.then(async (code) => {
+      await Promise.race([streamsDone, new Promise((r) => setTimeout(r, STREAM_GRACE_MS))]);
       log.info(
         { sessionId, pid: proc.pid, exitCode: code, contextUsed: latestUsage?.contextUsed },
         'claude exited',

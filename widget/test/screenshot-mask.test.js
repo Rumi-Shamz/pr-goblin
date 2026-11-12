@@ -56,6 +56,48 @@ describe('maskDocument', () => {
   })
 })
 
+describe('maskDocument: CSS background images', () => {
+  it('clears them inside a marked element', () => {
+    const doc = page('<div data-goblin-mask><span id="avatar" style="background-image:url(a.png)"></span></div>')
+    maskDocument(doc, { mask: 'none' })
+    expect(doc.getElementById('avatar').style.getPropertyValue('background-image')).toBe('none')
+  })
+
+  it("clears them everywhere with mask: 'all'", () => {
+    const doc = page('<div id="chart" style="background-image:url(c.png)"></div>')
+    doc.body.style.backgroundImage = 'url(bg.png)'
+    maskDocument(doc, { mask: 'all' })
+    expect(doc.getElementById('chart').style.getPropertyValue('background-image')).toBe('none')
+    expect(doc.body.style.getPropertyValue('background-image')).toBe('none')
+  })
+})
+
+describe('redaction drag', () => {
+  afterEach(() => PrGoblin.destroy())
+
+  function pointer(type, id, x, y) {
+    const e = new Event(type, { bubbles: true, cancelable: true })
+    Object.assign(e, { pointerId: id, clientX: x, clientY: y })
+    return e
+  }
+
+  it('a second finger cannot leave a drawn box unrecorded', () => {
+    const instance = PrGoblin.init({ endpoint: 'https://example.test/feedback' })
+    instance._screenshot = 'data:image/png;base64,AAAA'
+    const area = document.querySelector('#bp-shot')
+    area.getBoundingClientRect = () => ({ left: 0, top: 0, width: 100, height: 100 })
+    area.dispatchEvent(pointer('pointerdown', 1, 10, 10))
+    area.dispatchEvent(pointer('pointermove', 1, 50, 50))
+    // Second finger taps and lifts mid-drag: ignored.
+    area.dispatchEvent(pointer('pointerdown', 2, 80, 80))
+    area.dispatchEvent(pointer('pointerup', 2, 80, 80))
+    expect(instance._redactions).toEqual([])
+    area.dispatchEvent(pointer('pointerup', 1, 50, 50))
+    expect(instance._redactions).toEqual([{ x: 0.1, y: 0.1, w: 0.4, h: 0.4 }])
+    expect(document.querySelectorAll('.bp-shot-box').length).toBe(1)
+  })
+})
+
 describe('boxFromPoints', () => {
   it('normalises any drag direction and clamps to the image', () => {
     const rect = { left: 100, top: 50, width: 200, height: 100 }
