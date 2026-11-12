@@ -10,12 +10,15 @@ const ENV = envFromRecord({ ALLOWED_ORIGIN: 'https://app.example', GITHUB_TOKEN:
 
 interface Call { method: string; url: string; body: any }
 
-function stubGitHub(): Call[] {
+function stubGitHub(repoInfo: { private?: boolean } | null = { private: true }): Call[] {
   const calls: Call[] = []
   vi.stubGlobal('fetch', async (input: string | URL | Request, init: RequestInit = {}) => {
     const url = String(input)
     const method = (init.method ?? 'GET').toUpperCase()
     calls.push({ method, url, body: init.body ? JSON.parse(init.body as string) : undefined })
+    if (method === 'GET' && url.endsWith('/repos/acme/app')) {
+      return repoInfo ? new Response(JSON.stringify({ ...repoInfo, default_branch: 'main' }), { status: 200 }) : new Response('{}', { status: 404 })
+    }
     if (method === 'POST' && url.endsWith('/repos/acme/app/issues')) {
       return new Response(JSON.stringify({ html_url: 'https://github.com/acme/app/issues/3', number: 3 }), { status: 201 })
     }
@@ -73,7 +76,7 @@ describe('handleFeedbackRequest', () => {
   })
 })
 
-describe('SCREENSHOTS=off', () => {
+describe('screenshot storage', () => {
   const png = 'data:image/png;base64,iVBORw0KGgo='
 
   it('drops a screenshot: nothing is committed and the issue does not link one', async () => {
@@ -87,10 +90,30 @@ describe('SCREENSHOTS=off', () => {
     expect(issue.body.body).not.toContain('## Screenshot')
   })
 
-  it('stores it when not set (unchanged default)', async () => {
+  it('stores it in a private repo when not set', async () => {
     const calls = stubGitHub()
     await handleFeedbackRequest(postAt('/api/feedback', report({ screenshot: png })), ENV)
     expect(calls.some((c) => c.method === 'PUT' && c.url.includes('/contents/screenshots/'))).toBe(true)
+  })
+
+  it('refuses to store it in a public repo unless SCREENSHOTS=public, and still files the ticket', async () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {})
+    let calls = stubGitHub({ private: false })
+    const res = await handleFeedbackRequest(postAt('/api/feedback', report({ screenshot: png })), ENV)
+    expect(res.status).toBe(201)
+    expect(calls.some((c) => c.method === 'PUT' && c.url.includes('/contents/'))).toBe(false)
+    expect(calls.find((c) => c.method === 'POST' && c.url.endsWith('/issues'))!.body.body).not.toContain('bug-report-screenshots')
+
+    calls = stubGitHub({ private: false })
+    await handleFeedbackRequest(postAt('/api/feedback', report({ screenshot: png })), { ...ENV, SCREENSHOTS: 'public' })
+    expect(calls.some((c) => c.method === 'PUT' && c.url.includes('/contents/screenshots/'))).toBe(true)
+  })
+
+  it('refuses when the repo visibility cannot be read', async () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const calls = stubGitHub(null)
+    await handleFeedbackRequest(postAt('/api/feedback', report({ screenshot: png })), ENV)
+    expect(calls.some((c) => c.method === 'PUT' && c.url.includes('/contents/'))).toBe(false)
   })
 })
 
