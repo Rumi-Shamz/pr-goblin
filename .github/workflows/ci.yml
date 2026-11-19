@@ -19,7 +19,7 @@ jobs:
       - uses: oven-sh/setup-bun@v2
       - run: bun install --frozen-lockfile
       - run: bunx tsc --noEmit
-      - run: bun test src/
+      - run: bun test src/ --isolate
 
   node-packages:
     runs-on: ubuntu-latest

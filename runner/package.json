@@ -19,7 +19,7 @@
     "start": "bun src/cli/app.ts start",
     "run": "bun src/cli/app.ts run",
     "once": "bun src/cli/app.ts once",
-    "test": "bun test src/",
+    "test": "bun test src/ --isolate",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
