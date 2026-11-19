@@ -4,9 +4,10 @@ Releases are tagged `vX.Y.Z`; the tag `v0` always points at the latest 0.x relea
 
 While the version is 0.x, a minor release (0.**2**.0) may change behaviour or settings; such changes are listed under **Breaking**. A patch release (0.1.**1**) only fixes things.
 
-## Unreleased
+## 0.1.1 — 2026-11-19
 
 - **Widget on npm.** Install it with `npm install pr-goblin-widget` or load it from `https://cdn.jsdelivr.net/npm/pr-goblin-widget@0/dist/pr-goblin.iife.js`. Each release publishes it at the release's version. `PrGoblin.version` and the bundle banner now report that version (it said `1.3.1`, a leftover from bugpilot).
+- **Runner tests run each file in isolation** (`bun test src/ --isolate`), so a module mock in one test file can no longer break another. Contributors need a Bun version with `--isolate` (1.4 or later).
 
 ## 0.1.0 — 2026-11-12
 
