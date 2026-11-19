@@ -46,7 +46,7 @@ jobs:
 
       - name: Test the runner
         working-directory: runner
-        run: bun install --frozen-lockfile && bunx tsc --noEmit && bun test src/
+        run: bun install --frozen-lockfile && bunx tsc --noEmit && bun test src/ --isolate
 
       - name: Test and build the widget
         working-directory: widget

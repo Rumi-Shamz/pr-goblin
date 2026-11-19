@@ -222,7 +222,7 @@ To be told about releases, use GitHub's *Watch → Custom → Releases* on this 
 ## Development
 
 ```sh
-cd runner  && bun install  && bun test src/ && bunx tsc --noEmit
+cd runner  && bun install  && bun test src/ --isolate && bunx tsc --noEmit
 cd widget  && pnpm install && pnpm test
 cd intake  && pnpm install && pnpm test && pnpm typecheck
 cd actions/triage && pnpm install && pnpm test
