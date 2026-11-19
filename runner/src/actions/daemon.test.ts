@@ -4,6 +4,7 @@ import { tmpdir } from "os"
 import { join, resolve } from "path"
 
 import type { GoblinDaemonConfig } from "../config"
+import * as realPaths from "../paths"
 import { executeAction } from "./registry"
 
 const CONFIG: GoblinDaemonConfig = {
@@ -80,6 +81,7 @@ describe("daemon clean actions", () => {
     const calls: Array<[string, string]> = []
     const repoStoreArgs: string[] = []
     mock.module("../paths", () => ({
+      ...realPaths,
       GOBLIN_DIR: goblinDir,
       LOGS_DIR: resolve(goblinDir, "logs"),
     }))
@@ -144,6 +146,7 @@ describe("daemon clean actions", () => {
     const calls: Array<[string, string]> = []
     const repoStoreArgs: string[] = []
     mock.module("../paths", () => ({
+      ...realPaths,
       GOBLIN_DIR: goblinDir,
       LOGS_DIR: resolve(goblinDir, "logs"),
     }))
