@@ -102,6 +102,19 @@ export async function spawn(
   };
 }
 
+/**
+ * "claude", "codex:gpt-5.5", "claude:opus" → agent and optional model.
+ * "auto", "" or undefined → no agent (the caller picks the one that does not implement).
+ */
+export function parseAgentSpec(spec: string | undefined): { agent?: string; model?: string } {
+  const value = spec?.trim();
+  if (!value || value === 'auto') return {};
+  const i = value.indexOf(':');
+  if (i < 0) return { agent: value };
+  const model = value.slice(i + 1).trim();
+  return { agent: value.slice(0, i), ...(model ? { model } : {}) };
+}
+
 export async function spawnForPostAgent(
   task: Task,
   workDir: string,
@@ -111,7 +124,8 @@ export async function spawnForPostAgent(
 ): Promise<AgentResult> {
   const agentTask = toAgentTask(task);
   const implAgent = config.agent.default === 'auto' ? 'claude' : config.agent.default;
-  const agent = agentOverride || (implAgent === 'claude' ? 'codex' : 'claude');
+  const spec = parseAgentSpec(agentOverride);
+  const agent = spec.agent ?? (implAgent === 'claude' ? 'codex' : 'claude');
   let latestUsage: ACPEvent['usage'] | undefined;
   const result = await rawSpawnAgent(
     agentTask,
@@ -126,6 +140,10 @@ export async function spawnForPostAgent(
     1,
     agent,
     workDir, // logDir = post-agent's own directory
+    undefined,
+    undefined,
+    undefined,
+    spec.model,
   );
   const exitCode = await result.done;
   persistPostAgentUsage(workDir, latestUsage);

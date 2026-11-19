@@ -104,6 +104,34 @@ describe("buildAgentRules", () => {
     expect(skillsFor({ tracker: "linear" })).toEqual(["goblin-commit", "goblin-push", "goblin-pull", "goblin-linear"])
   })
 
+  test("investigate mode names the labels a human decides with, and the untrusted label only when it applies", async () => {
+    const { buildAgentRules } = await import("./context-injector")
+    const trusted = buildAgentRules("app", {
+      tracker: "github",
+      mode: "investigate",
+      review: { approved: "ok-to-fix", reinvestigate: "look-again" },
+    })
+    expect(trusted).toContain("`ok-to-fix`")
+    expect(trusted).toContain("`look-again`")
+    expect(trusted).not.toContain("untrusted` label")
+    expect(trusted).toContain("this is a follow-up")
+
+    const untrusted = buildAgentRules("app", {
+      tracker: "github",
+      mode: "investigate",
+      review: { approved: "ok-to-fix", reinvestigate: "look-again", untrusted: "untrusted" },
+    })
+    expect(untrusted).toContain("remove the `untrusted` label")
+    expect(untrusted).toContain("reported by someone outside the team")
+  })
+
+  test("the implementing agent is told to use the investigation and the challenge", async () => {
+    const { buildAgentRules } = await import("./context-injector")
+    const rules = buildAgentRules("app", { tracker: "github" })
+    expect(rules).toContain("**Goblin Challenge**")
+    expect(rules).toContain("authorAssociation")
+  })
+
   test("every skill the rules name is bundled", async () => {
     const { skillsFor } = await import("./context-injector")
     for (const tracker of ["linear", "github"] as const) {

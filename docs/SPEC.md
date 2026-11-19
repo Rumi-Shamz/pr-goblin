@@ -1,6 +1,6 @@
 # pr-goblin: specification and status
 
-Last updated 2026-11-12.
+Last updated 2026-11-19.
 
 ## Goal
 
@@ -18,6 +18,7 @@ A module you plug into a project so that issues reported by users and testers ar
 | Lanes | Urgent now, batch in a window, normal on next poll | Critical work should not wait; cosmetic work should not interrupt |
 | Trust | Reports are untrusted unless the host backend signs the reporter | Report text becomes agent input |
 | Merging | Never automatic | CI and a human are the gate |
+| Review before fixing | Opt-in (`reviewFirst`): investigate read-only, a second agent challenges the diagnosis, a human approves or asks for more | A human should decide on a diagnosis that has been argued against, not on one agent's first answer. Opt-in because it doubles agent runs and adds a human round trip |
 
 ## What exists
 
@@ -27,6 +28,8 @@ A module you plug into a project so that issues reported by users and testers ar
 | Runner: GitHub Issues source, state in labels | yes | 14 |
 | Runner: lane and trust policy | yes | 17 |
 | Runner: read-only investigate mode | yes | covered in kernel + rules tests |
+| Runner: review first, challenge agent, approve / reinvestigate labels | yes | 6 kernel, 6 policy, 3 challenge rules, 2 rules, 6 config, 1 GitHub source |
+| Runner: model per post-agent (`claude:opus`) | yes | 2 (parsing only; the `--model` / `-c model=` flags are not exercised) |
 | Runner: `goblin once` for CI, config from environment variables | yes | yes |
 | Runner: concurrency cap | yes | yes |
 | Intake: GitHub target (from bugpilot) | yes | yes |
@@ -42,7 +45,7 @@ A module you plug into a project so that issues reported by users and testers ar
 | Tagged releases, `v0` major tag | workflow written | not yet run |
 | Triage action (from bugpilot) | yes, unchanged apart from naming | 33 |
 
-Test totals at this commit: runner 358, intake 82, widget 94, triage 33.
+Test totals at this commit: runner 388, intake 82, widget 97, triage 33.
 
 ## What has not been verified
 
@@ -55,7 +58,8 @@ Be clear about these before relying on it.
 5. **`goblin once` was smoke-tested live only on the empty path** (poll a real repo, find nothing, exit 0).
 6. **`goblin init` is still the Linear-only wizard** inherited from reeve.
 7. **Usage-limit detection is matched against known message formats, not observed live.** Claude's messages ("usage limit reached|<epoch>", "5-hour limit reached ∙ resets 3pm") and API 429s are recognised; Codex's are best effort, and a Codex limit that exits with code 0 would not be caught. An unrecognised limit falls back to the ordinary retry, which spends retries and may park the ticket.
-8. **Screenshot masking was checked in Chromium only.** Form values, `data-goblin-mask` and custom selectors were blacked out in the captured image and the reporter's box was painted into the outgoing image; Firefox and Safari were not tried.
+8. **The review-first loop has not run against a real agent.** The kernel's part (states, labels, the cap, a failing challenge) is tested with fakes; whether the challenge agent finds and answers the investigation comment, and whether agents respect the maintainer-only rule for comments, is untested. Linear's `removeLabel` was written from the API schema only.
+9. **Screenshot masking was checked in Chromium only.** Form values, `data-goblin-mask` and custom selectors were blacked out in the captured image and the reporter's box was painted into the outgoing image; Firefox and Safari were not tried.
 
 ## Not built yet
 

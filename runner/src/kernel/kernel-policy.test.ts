@@ -53,6 +53,8 @@ interface Harness {
   rules: Array<{ identifier: string; rules: unknown }>
   spawned: string[]
   investigated: string[]
+  removedLabels: Array<string | undefined>
+  challenged: string[]
   setPoll(items: SourceItem[]): void
   setDisposition(d: SourceDisposition): void
 }
@@ -64,6 +66,8 @@ async function harness(config: GoblinDaemonConfig, hour = 12): Promise<Harness> 
   let polled: SourceItem[] = []
   let disposition: SourceDisposition = "passive"
   const investigated: string[] = []
+  const removedLabels: Array<string | undefined> = []
+  const challenged: string[] = []
   const rules: Harness["rules"] = []
   const spawned: string[] = []
 
@@ -73,7 +77,7 @@ async function harness(config: GoblinDaemonConfig, hour = 12): Promise<Harness> 
     onStart: async () => {},
     onDone: async () => {},
     fetchDisposition: async () => disposition,
-    onInvestigated: async (i) => { investigated.push(i.id) },
+    onInvestigated: async (i, options) => { investigated.push(i.id); removedLabels.push(options?.removeLabel) },
   }
 
   const { Kernel } = await import(`./kernel?policy-test=${++counter}`)
@@ -98,12 +102,17 @@ async function harness(config: GoblinDaemonConfig, hour = 12): Promise<Harness> 
   }
   kernel.repoStore = { async ensure(repo: string): Promise<string> { return `/fake/repos/${repo}` } }
   kernel.spawnAndAttach = async (task: Task): Promise<void> => { spawned.push(task.id) }
+  kernel.runChallenge = async (task: Task): Promise<void> => {
+    if (config.challenge && config.challenge !== "off") challenged.push(task.id)
+  }
 
   return {
     kernel,
     rules,
     spawned,
     investigated,
+    removedLabels,
+    challenged,
     setPoll: (items) => { polled = items },
     setDisposition: (d) => { disposition = d },
   }
@@ -163,7 +172,14 @@ describe("Kernel policy", () => {
     await h.kernel.dispatch()
 
     expect(h.rules).toContainEqual({ identifier: "NORMAL", rules: { tracker: "github", mode: "implement" } })
-    expect(h.rules).toContainEqual({ identifier: "PROBE", rules: { tracker: "github", mode: "investigate" } })
+    expect(h.rules).toContainEqual({
+      identifier: "PROBE",
+      rules: {
+        tracker: "github",
+        mode: "investigate",
+        review: { approved: "goblin:approved", reinvestigate: "goblin:reinvestigate", untrusted: "untrusted" },
+      },
+    })
   })
 
   test("dispatch respects maxConcurrent and works urgent tickets first", async () => {
@@ -218,6 +234,95 @@ describe("Kernel policy", () => {
     expect(task.state).toBe("queued")
     expect(task.mode).toBe("implement")
     expect(task.labels).toEqual(["critical", "goblin:investigated"])
+  })
+
+  describe("review first", () => {
+    const reviewFirst = () =>
+      createConfig({ policy: { ...DEFAULT_POLICY, reviewFirst: true }, challenge: "claude:opus" })
+
+    async function investigate(h: Harness, labels: string[]): Promise<void> {
+      h.setPoll([item("bug", labels)])
+      await h.kernel.intake()
+      await h.kernel.dispatch()
+      await h.kernel.onAgentExit("bug", { exitCode: 0, stderr: "" })
+    }
+
+    test("a trusted ticket is investigated and challenged, then held for a human", async () => {
+      const h = await harness(reviewFirst())
+      await investigate(h, [])
+
+      const task: Task = h.kernel.store.get("bug")
+      expect(h.rules[0]).toEqual({
+        identifier: "BUG",
+        rules: { tracker: "github", mode: "investigate", review: { approved: "goblin:approved", reinvestigate: "goblin:reinvestigate" } },
+      })
+      expect(h.challenged).toEqual(["bug"])
+      expect(h.investigated).toEqual(["bug"])
+      expect(h.removedLabels).toEqual([undefined])
+      expect(task.state).toBe("done")
+      expect(task.investigations).toBe(1)
+
+      // Investigated, no decision yet → held, not investigated again.
+      h.setPoll([item("bug", ["goblin:investigated"])])
+      await h.kernel.intake()
+      expect(h.kernel.store.get("bug").state).toBe("done")
+      expect(h.kernel.lastAdmission.held).toBe(1)
+    })
+
+    test("the reinvestigate label investigates again and is removed afterwards", async () => {
+      const h = await harness(reviewFirst())
+      await investigate(h, [])
+
+      h.setPoll([item("bug", ["goblin:investigated", "goblin:reinvestigate"])])
+      await h.kernel.intake()
+      expect(h.kernel.store.get("bug")).toMatchObject({ state: "queued", mode: "investigate" })
+
+      await h.kernel.dispatch()
+      await h.kernel.onAgentExit("bug", { exitCode: 0, stderr: "" })
+
+      expect(h.challenged).toEqual(["bug", "bug"])
+      expect(h.removedLabels).toEqual([undefined, "goblin:reinvestigate"])
+      expect(h.kernel.store.get("bug")).toMatchObject({ state: "done", investigations: 2 })
+    })
+
+    test("the approved label implements the investigated ticket", async () => {
+      const h = await harness(reviewFirst())
+      await investigate(h, [])
+
+      h.setPoll([item("bug", ["goblin:investigated", "goblin:approved"])])
+      await h.kernel.intake()
+
+      expect(h.kernel.store.get("bug")).toMatchObject({ state: "queued", mode: "implement" })
+    })
+
+    test("repeated reinvestigation stops at the cap", async () => {
+      const h = await harness(reviewFirst())
+      await investigate(h, [])
+      h.kernel.store.get("bug").investigations = 5
+
+      h.setPoll([item("bug", ["goblin:investigated", "goblin:reinvestigate"])])
+      await h.kernel.intake()
+
+      expect(h.kernel.store.get("bug").state).toBe("done")
+    })
+
+    test("a failing challenge still records the investigation", async () => {
+      const h = await harness(reviewFirst())
+      h.kernel.runChallenge = async (): Promise<void> => { throw new Error("challenge agent exited 1") }
+      await investigate(h, [])
+
+      expect(h.investigated).toEqual(["bug"])
+      expect(h.kernel.store.get("bug").state).toBe("done")
+    })
+
+    test("without reviewFirst a trusted ticket is implemented straight away and nothing is challenged", async () => {
+      const h = await harness(createConfig())
+      h.setPoll([item("bug")])
+      await h.kernel.intake()
+
+      expect(h.kernel.store.get("bug")).toMatchObject({ state: "queued", mode: "implement" })
+      expect(h.challenged).toEqual([])
+    })
   })
 
   test("runOnce works the admitted tickets and returns a summary", async () => {

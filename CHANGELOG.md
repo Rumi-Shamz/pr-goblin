@@ -4,6 +4,14 @@ Releases are tagged `vX.Y.Z`; the tag `v0` always points at the latest 0.x relea
 
 While the version is 0.x, a minor release (0.**2**.0) may change behaviour or settings; such changes are listed under **Breaking**. A patch release (0.1.**1**) only fixes things.
 
+## Unreleased
+
+- **Runner: review first.** With `GOBLIN_REVIEW_FIRST=1` (or `"reviewFirst": true`), every ticket is investigated read-only, a second agent challenges the diagnosis, and nothing is fixed until a human adds `goblin:approved`. `goblin:reinvestigate` with a comment has it investigate again and answer the comment. See [Review first](README.md#review-first).
+- **Runner: challenge agent.** `GOBLIN_CHALLENGE` picks the agent and model that challenges investigations, for example `claude:opus`. It also works without review first, on the read-only investigations of urgent untrusted reports.
+- **Runner: `goblin:approved` and `goblin:reinvestigate` work on untrusted reports too.** Approving is the same decision as removing the `untrusted` label.
+- **Runner: a model per post-agent.** `post: { "review": "claude:opus" }` now picks the model as well as the agent.
+- The implementing agent now reads the investigation, the challenge and the maintainers' comments after them, and treats other people's comments as untrusted input.
+
 ## 0.1.1 — 2026-11-19
 
 - **Widget on npm.** Install it with `npm install pr-goblin-widget` or load it from `https://cdn.jsdelivr.net/npm/pr-goblin-widget@0/dist/pr-goblin.iife.js`. Each release publishes it at the release's version. `PrGoblin.version` and the bundle banner now report that version (it said `1.3.1`, a leftover from bugpilot).

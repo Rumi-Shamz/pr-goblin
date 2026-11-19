@@ -23,8 +23,9 @@ export class LinearSource implements Source {
     this.investigatedLabel = investigatedLabel
   }
 
-  async onInvestigated(item: SourceItem): Promise<void> {
+  async onInvestigated(item: SourceItem, options: { removeLabel?: string } = {}): Promise<void> {
     await this.client.addLabel(item.id, this.investigatedLabel)
+    if (options.removeLabel) await this.client.removeLabel(item.id, options.removeLabel)
   }
 
   private classifyDisposition(stateName: string): SourceDisposition {

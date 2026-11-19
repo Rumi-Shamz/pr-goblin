@@ -11,6 +11,15 @@
 // influenced, so it never gets a code-writing agent on its own. If it is also
 // urgent, an agent investigates read-only so a human has a head start;
 // otherwise it waits for a human to triage it and remove the label.
+//
+// Review first (opt-in, `reviewFirst`): trusted tickets are not implemented
+// straight away either. An agent investigates read-only and posts a diagnosis,
+// a second agent challenges it (see post-agent/challenge.ts), and the ticket
+// is held until a human acts on the ticket:
+//   approvedLabel      → implement, using the diagnosis, the challenge and the human's comments
+//   reinvestigateLabel → investigate again, answering the human's comment
+// The two labels also work on untrusted tickets: approving one is the same
+// human decision as removing the untrusted label.
 
 import type { SourceItem } from "./types"
 
@@ -24,8 +33,14 @@ export interface PolicyConfig {
   batchLabels: string[]
   /** Label marking a report from an untrusted reporter. */
   untrustedLabel: string
-  /** Label the runner adds once an untrusted urgent ticket has been investigated, so it is not investigated twice. */
+  /** Label the runner adds once a ticket has been investigated, so it is not investigated twice. */
   investigatedLabel: string
+  /** Investigate and challenge every ticket, and implement only once a human approves. Default false. */
+  reviewFirst: boolean
+  /** Label a human adds to let pr-goblin implement an investigated ticket. */
+  approvedLabel: string
+  /** Label a human adds, with a comment, to have pr-goblin investigate again. The runner removes it afterwards. */
+  reinvestigateLabel: string
   /** Local-time window in which batch tickets are released. start === end disables the window. */
   batchWindow: { startHour: number; endHour: number }
   /** Release the batch early once this many batch tickets are waiting. 0 disables. */
@@ -39,6 +54,9 @@ export const DEFAULT_POLICY: PolicyConfig = {
   batchLabels: ["batch"],
   untrustedLabel: "untrusted",
   investigatedLabel: "goblin:investigated",
+  reviewFirst: false,
+  approvedLabel: "goblin:approved",
+  reinvestigateLabel: "goblin:reinvestigate",
   batchWindow: { startHour: 2, endHour: 5 },
   batchMinCount: 0,
   batchMaxSize: 5,
@@ -79,6 +97,19 @@ export function isUntrusted(item: Pick<SourceItem, "labels">, cfg: PolicyConfig)
 /** Classify one ticket. Says nothing about whether a batch is currently released. */
 export function decide(item: Pick<SourceItem, "labels" | "priority">, cfg: PolicyConfig = DEFAULT_POLICY): Decision {
   const urgent = isUrgent(item, cfg)
+  const lane: Lane = urgent ? "urgent" : hasBatchLabel(item.labels, cfg.batchLabels) ? "batch" : "normal"
+
+  // A human asked for more investigation. Read-only, so this is safe on an
+  // untrusted ticket too. It comes before approval: asking for more is the
+  // more recent, more cautious instruction.
+  if (hasLabel(item.labels, [cfg.reinvestigateLabel])) {
+    return { lane: urgent ? "urgent" : "normal", mode: "investigate", reason: "human asked for more investigation" }
+  }
+
+  // A human approved the fix.
+  if (hasLabel(item.labels, [cfg.approvedLabel])) {
+    return { lane, mode: "implement", reason: "approved by a human" }
+  }
 
   if (isUntrusted(item, cfg)) {
     if (hasLabel(item.labels, [cfg.investigatedLabel])) {
@@ -89,10 +120,15 @@ export function decide(item: Pick<SourceItem, "labels" | "priority">, cfg: Polic
       : { lane: "hold", mode: "investigate", reason: "untrusted: waiting for human triage" }
   }
 
-  if (urgent) return { lane: "urgent", mode: "implement", reason: "urgent" }
-  if (hasBatchLabel(item.labels, cfg.batchLabels)) {
-    return { lane: "batch", mode: "implement", reason: "batch lane" }
+  if (cfg.reviewFirst) {
+    if (hasLabel(item.labels, [cfg.investigatedLabel])) {
+      return { lane: "hold", mode: "investigate", reason: "review first: investigated, waiting for a human to approve" }
+    }
+    return { lane, mode: "investigate", reason: "review first: investigate before any fix" }
   }
+
+  if (urgent) return { lane: "urgent", mode: "implement", reason: "urgent" }
+  if (lane === "batch") return { lane: "batch", mode: "implement", reason: "batch lane" }
   return { lane: "normal", mode: "implement", reason: "normal" }
 }
 

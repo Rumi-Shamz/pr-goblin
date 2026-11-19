@@ -158,7 +158,7 @@ export class GitHubSource implements Source {
     ])
   }
 
-  async onInvestigated(item: SourceItem): Promise<void> {
+  async onInvestigated(item: SourceItem, options: { removeLabel?: string } = {}): Promise<void> {
     const ref = parseItemId(item.id)
     if (!ref) return
     // Creating a label that exists fails harmlessly; adding a missing one would not.
@@ -166,6 +166,7 @@ export class GitHubSource implements Source {
     const result = await this.gh([
       "issue", "edit", String(ref.number), "--repo", ref.repo,
       "--add-label", this.cfg.investigatedLabel,
+      ...(options.removeLabel ? ["--remove-label", options.removeLabel] : []),
     ])
     if (result.exitCode !== 0) {
       throw new Error(`could not label ${item.id} as investigated: ${result.stderr.trim()}`)

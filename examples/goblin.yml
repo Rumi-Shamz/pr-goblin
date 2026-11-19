@@ -78,3 +78,8 @@ jobs:
           LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}
           GOBLIN_LINEAR_TEAM: ${{ vars.GOBLIN_LINEAR_TEAM }}
           GOBLIN_LINEAR_PROJECT: ${{ vars.GOBLIN_LINEAR_PROJECT }}
+          # Review first: set the repository variable GOBLIN_REVIEW_FIRST to 1 to have every
+          # ticket investigated and challenged, and fixed only after you add `goblin:approved`.
+          # GOBLIN_CHALLENGE picks the challenger, e.g. claude:opus. See README "Review first".
+          GOBLIN_REVIEW_FIRST: ${{ vars.GOBLIN_REVIEW_FIRST }}
+          GOBLIN_CHALLENGE: ${{ vars.GOBLIN_CHALLENGE }}

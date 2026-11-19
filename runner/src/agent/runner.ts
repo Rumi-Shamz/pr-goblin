@@ -99,6 +99,7 @@ export async function spawnAgent(
   logMetadata?: SpawnLogMetadata,
   sessionId?: string,
   threadId?: string,
+  model?: string,
 ): Promise<SpawnResult> {
   const log = noopLogger;
   const agentName = agent;
@@ -137,6 +138,7 @@ export async function spawnAgent(
     logDir: resolvedLogDir,
     logMetadata,
     sandbox,
+    model,
   });
 
   log.info({ agentName, pid: result.pid, attempt }, 'Spawned native agent');
