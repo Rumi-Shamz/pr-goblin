@@ -11,12 +11,21 @@
 #    users who pinned an exact tag or SHA are unaffected.
 #
 # Write the release notes under the version's heading in CHANGELOG.md first.
+#
+# Release candidates: `git tag v0.2.0-rc.1 && git push origin v0.2.0-rc.1`.
+# The same tests and builds run, but the GitHub release is marked as a
+# pre-release, npm gets it under the `next` dist-tag (`npm install
+# pr-goblin-widget@next`), and the major tag does not move. So users on `v0`
+# or `latest` never receive a candidate. Its notes come from a
+# `## 0.2.0-rc.1` section if there is one, else from `## Unreleased`.
 
 name: Release
 
 on:
   push:
-    tags: ['v[0-9]+.[0-9]+.[0-9]+']
+    tags:
+      - 'v[0-9]+.[0-9]+.[0-9]+'
+      - 'v[0-9]+.[0-9]+.[0-9]+-rc.[0-9]+'
 
 permissions:
   contents: write
@@ -35,6 +44,18 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+
+      - name: Release or release candidate
+        id: kind
+        run: |
+          if [[ "$GITHUB_REF_NAME" =~ ^v[0-9]+\.[0-9]+\.[0-9]+-rc\.[0-9]+$ ]]; then
+            echo "prerelease=true" >> "$GITHUB_OUTPUT"
+          elif [[ "$GITHUB_REF_NAME" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "prerelease=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "::error::$GITHUB_REF_NAME is neither vX.Y.Z nor vX.Y.Z-rc.N"
+            exit 1
+          fi
 
       - uses: oven-sh/setup-bun@v2
       - uses: pnpm/action-setup@v4
@@ -63,12 +84,20 @@ jobs:
         run: pnpm install --frozen-lockfile && pnpm test
 
       - name: Release notes from CHANGELOG.md
+        env:
+          PRERELEASE: ${{ steps.kind.outputs.prerelease }}
         run: |
           version="${GITHUB_REF_NAME#v}"
-          awk -v v="$version" '
-            /^## / { if (found) exit; if (index($0, "## " v " ") == 1 || $0 == "## " v) { found = 1; next } }
-            found { print }
-          ' CHANGELOG.md > notes.md
+          section() {
+            awk -v v="$1" '
+              /^## / { if (found) exit; if (index($0, "## " v " ") == 1 || $0 == "## " v) { found = 1; next } }
+              found { print }
+            ' CHANGELOG.md
+          }
+          section "$version" > notes.md
+          if [ ! -s notes.md ] && [ "$PRERELEASE" = "true" ]; then
+            section "Unreleased" > notes.md
+          fi
           if [ ! -s notes.md ]; then
             echo "::error::CHANGELOG.md has no section for $version"
             exit 1
@@ -81,7 +110,9 @@ jobs:
           cp widget/dist/pr-goblin.iife.js "pr-goblin-widget-${GITHUB_REF_NAME}.iife.js"
           cp intake/dist/pr-goblin-intake.mjs "pr-goblin-intake-${GITHUB_REF_NAME}.mjs"
           cp intake/dist/node.mjs "pr-goblin-intake-node-${GITHUB_REF_NAME}.mjs"
-          gh release create "$GITHUB_REF_NAME" --title "$GITHUB_REF_NAME" --notes-file notes.md --verify-tag \
+          prerelease=()
+          [ "${{ steps.kind.outputs.prerelease }}" = "true" ] && prerelease=(--prerelease)
+          gh release create "$GITHUB_REF_NAME" --title "$GITHUB_REF_NAME" --notes-file notes.md --verify-tag "${prerelease[@]}" \
             "pr-goblin-widget-${GITHUB_REF_NAME}.iife.js" \
             "pr-goblin-intake-${GITHUB_REF_NAME}.mjs" \
             "pr-goblin-intake-node-${GITHUB_REF_NAME}.mjs"
@@ -94,17 +125,24 @@ jobs:
             echo "pr-goblin-widget@$version is already on npm; skipping"
             exit 0
           fi
-          # Only the newest release becomes `latest`, so a maintenance release
-          # (0.1.1 after 0.2.0) does not move `npm install` users backwards.
+          # A release candidate goes to `next`. Of the releases, only the newest
+          # becomes `latest`, so a maintenance release (0.1.1 after 0.2.0) does
+          # not move `npm install` users backwards.
           git fetch --force --tags origin
           newest=$(git tag -l 'v*.*.*' | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | sort -V | tail -1)
-          dist_tag=latest
-          [ "$newest" = "$GITHUB_REF_NAME" ] || dist_tag=maintenance
+          if [ "${{ steps.kind.outputs.prerelease }}" = "true" ]; then
+            dist_tag=next
+          elif [ "$newest" = "$GITHUB_REF_NAME" ]; then
+            dist_tag=latest
+          else
+            dist_tag=maintenance
+          fi
           # Trusted publishing needs npm 11.5.1 or later.
           npm install -g npm@11.6.2
           npm publish --access public --provenance --tag "$dist_tag"
 
       - name: Move the major tag
+        if: steps.kind.outputs.prerelease == 'false'
         # Only when this is the newest release of its major version, so a later
         # maintenance release (v0.1.1 after v0.2.0) never moves v0 backwards.
         run: |

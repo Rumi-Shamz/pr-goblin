@@ -219,6 +219,10 @@ To be told about releases, use GitHub's *Watch → Custom → Releases* on this 
 
 **Releasing** (maintainers): add the version's section to CHANGELOG.md, then `git tag vX.Y.Z && git push origin vX.Y.Z`. The release workflow tests everything, publishes a GitHub release with the built widget and intake files, publishes the widget to npm at the tag's version, and moves the major tag.
 
+**Release candidates** (maintainers): to try a release before users get it, tag `vX.Y.Z-rc.N` instead, for example `git tag v0.2.0-rc.1 && git push origin v0.2.0-rc.1`. The same tests and builds run, but the GitHub release is marked as a pre-release, npm gets it under `next` (`npm install pr-goblin-widget@next`), and `v0` and `latest` stay where they are. Its notes come from `## Unreleased` unless the changelog has a section for that exact candidate. When it holds up, rename `## Unreleased` to the version and tag `vX.Y.Z`.
+
+Pull requests into `main` merge only once CI passes (the runner job and the widget, intake and triage jobs).
+
 ## Development
 
 ```sh
