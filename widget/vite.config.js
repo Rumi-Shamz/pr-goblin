@@ -2,8 +2,9 @@ import { readFileSync, writeFileSync } from 'fs'
 import { resolve } from 'path'
 import { defineConfig } from 'vite'
 
-// Keep in lockstep with VERSION in src/index.js and the git release tag.
-const WIDGET_VERSION = '1.3.1'
+// The version comes from package.json, which the release workflow sets from
+// the git tag (v0.2.0 -> 0.2.0). It is also injected as __PR_GOBLIN_VERSION__.
+const WIDGET_VERSION = JSON.parse(readFileSync(resolve(__dirname, 'package.json'), 'utf8')).version
 const BANNER = `/* pr-goblin-widget v${WIDGET_VERSION} */`
 
 // Prepend the version banner to every built bundle (es, umd, iife) so
@@ -41,6 +42,7 @@ export default defineConfig({
       // html2canvas is bundled — consumers shouldn't need to install it separately
     },
   },
+  define: { __PR_GOBLIN_VERSION__: JSON.stringify(WIDGET_VERSION) },
   plugins: [versionBanner],
   // Dev server points at the test harness
   root: '.',

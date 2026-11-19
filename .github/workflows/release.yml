@@ -3,7 +3,10 @@
 # 1. Runs the tests.
 # 2. Publishes a GitHub release with the built widget and intake files, so
 #    people who copy them into their app can take a known version.
-# 3. Moves the major tag (v0, v1, …) to this release. The example workflows
+# 3. Publishes the widget to npm as pr-goblin-widget, at the tag's version.
+#    No token: npm trusts this workflow through OIDC (trusted publishing,
+#    configured on the package's settings page on npmjs.com).
+# 4. Moves the major tag (v0, v1, …) to this release. The example workflows
 #    reference that tag, so users on it get the release on their next run, and
 #    users who pinned an exact tag or SHA are unaffected.
 #
@@ -17,6 +20,7 @@ on:
 
 permissions:
   contents: write
+  id-token: write # npm trusted publishing
 
 # One run per tag, so a release waiting behind another is never cancelled.
 # The major-tag step below is safe when two releases run at once.
@@ -46,7 +50,9 @@ jobs:
 
       - name: Test and build the widget
         working-directory: widget
-        run: pnpm install --frozen-lockfile && pnpm test && pnpm build
+        run: |
+          npm version "${GITHUB_REF_NAME#v}" --no-git-tag-version --allow-same-version
+          pnpm install --frozen-lockfile && pnpm test && pnpm build
 
       - name: Test and build the intake
         working-directory: intake
@@ -79,6 +85,24 @@ jobs:
             "pr-goblin-widget-${GITHUB_REF_NAME}.iife.js" \
             "pr-goblin-intake-${GITHUB_REF_NAME}.mjs" \
             "pr-goblin-intake-node-${GITHUB_REF_NAME}.mjs"
+
+      - name: Publish the widget to npm
+        working-directory: widget
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          if [ -n "$(npm view "pr-goblin-widget@$version" version 2>/dev/null)" ]; then
+            echo "pr-goblin-widget@$version is already on npm; skipping"
+            exit 0
+          fi
+          # Only the newest release becomes `latest`, so a maintenance release
+          # (0.1.1 after 0.2.0) does not move `npm install` users backwards.
+          git fetch --force --tags origin
+          newest=$(git tag -l 'v*.*.*' | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | sort -V | tail -1)
+          dist_tag=latest
+          [ "$newest" = "$GITHUB_REF_NAME" ] || dist_tag=maintenance
+          # Trusted publishing needs npm 11.5.1 or later.
+          npm install -g npm@11.6.2
+          npm publish --access public --provenance --tag "$dist_tag"
 
       - name: Move the major tag
         # Only when this is the newest release of its major version, so a later

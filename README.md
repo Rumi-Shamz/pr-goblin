@@ -131,7 +131,7 @@ Deploy the endpoint, then load the widget:
 
 The widget takes on the look of the page it is on. At start-up, and again each time the dialog opens or the page switches between light and dark, it reads the page's brand colour, background, text colour, font and corner radius — from design tokens such as `--primary` and `--radius` (shadcn/ui, Bootstrap, MUI, Mantine and similar) or, failing that, from the page's own buttons. Any `--bp-*` variable you set in your own CSS is left alone, `color: '#rrggbb'` still pins the brand colour, and `theme: 'none'` turns the behaviour off.
 
-Build the widget with `cd widget && pnpm install && pnpm build`, or download `pr-goblin-widget-vX.Y.Z.iife.js` from a [release](https://github.com/Rumi-Shamz/pr-goblin/releases). Pass `captureLogs: false` to turn off console and network error capture. Captured URLs have their query strings removed, and request and response bodies are never read.
+Build the widget with `cd widget && pnpm install && pnpm build`, download `pr-goblin-widget-vX.Y.Z.iife.js` from a [release](https://github.com/Rumi-Shamz/pr-goblin/releases), or install it from npm (`npm install pr-goblin-widget`, then `import PrGoblin from 'pr-goblin-widget'`) or a CDN (`https://cdn.jsdelivr.net/npm/pr-goblin-widget@0/dist/pr-goblin.iife.js`). Pass `captureLogs: false` to turn off console and network error capture. Captured URLs have their query strings removed, and request and response bodies are never read.
 
 ### Screenshots and client data
 
@@ -209,13 +209,15 @@ Every part is versioned together, by git tags `vX.Y.Z`, with notes in [CHANGELOG
 |---|---|---|
 | `examples/goblin.yml` or `examples/triage.yml` | On the next run, if you reference `v0` (the default) | Pin an exact tag (`v0.1.0`) or a commit SHA, and let Dependabot propose bumps |
 | The runner as a daemon | When you `git pull` (or `git checkout v0.2.0`) and restart | — |
+| The widget from npm (`pr-goblin-widget`) | When you run `npm update` (a `^0.1.0` range takes patch releases only) | Your package.json range and lockfile |
+| The widget from a CDN (`cdn.jsdelivr.net/npm/pr-goblin-widget@0/…`) | Within hours of a release, as the CDN cache expires | Pin an exact version in the URL (`@0.1.0`) |
 | The widget or intake files copied into your app | When you download the new files from the release page | — |
 
 The `v0` tag moves to each 0.x release. Within 0.x a minor release may change behaviour; it says so under **Breaking** in the changelog. If that is too much movement, pin an exact version.
 
 To be told about releases, use GitHub's *Watch → Custom → Releases* on this repository.
 
-**Releasing** (maintainers): add the version's section to CHANGELOG.md, then `git tag vX.Y.Z && git push origin vX.Y.Z`. The release workflow tests everything, publishes a GitHub release with the built widget and intake files, and moves the major tag.
+**Releasing** (maintainers): add the version's section to CHANGELOG.md, then `git tag vX.Y.Z && git push origin vX.Y.Z`. The release workflow tests everything, publishes a GitHub release with the built widget and intake files, publishes the widget to npm at the tag's version, and moves the major tag.
 
 ## Development
 
