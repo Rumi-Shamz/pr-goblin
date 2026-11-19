@@ -42,7 +42,7 @@ A module you plug into a project so that issues reported by users and testers ar
 | Intake: screenshots stored only in a private repo | yes | 3 |
 | Runner: subscription sign-in detection, `GOBLIN_AUTH` | yes | 8 |
 | Runner: usage limits pause instead of failing | yes | 8 + 2 kernel |
-| Tagged releases, `v0` major tag | workflow written | not yet run |
+| Tagged releases, `v0` major tag, widget on npm with provenance | yes | ran for v0.1.1; release candidates (`-rc.N` → npm `next`) not yet run |
 | Triage action (from bugpilot) | yes, unchanged apart from naming | 33 |
 
 Test totals at this commit: runner 388, intake 82, widget 97, triage 33.
@@ -72,7 +72,7 @@ Be clear about these before relying on it.
 | Screenshots without a GitHub repo | With a Linear-only intake the screenshot is dropped. Linear's file upload API is the fix. |
 | Chat intake | Planned as an optional extension, bring your own key. |
 | Single-binary runner | `bun build --compile`, so users need no Bun install. |
-| npm packages | Releases ship on GitHub (tags, built files). The name `pr-goblin` is reserved on npm by the maintainer (a 0.0.1 placeholder); publishing the widget and intake there would let `npm update` deliver them. |
+| npm packages beyond the widget | The widget is published as `pr-goblin-widget`. The intake is not; the name `pr-goblin` (a 0.0.1 placeholder) is kept for the runner as a CLI (`npx pr-goblin`). |
 
 ## Suggested order
 
