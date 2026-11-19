@@ -11,6 +11,7 @@ While the version is 0.x, a minor release (0.**2**.0) may change behaviour or se
 - **Runner: `goblin:approved` and `goblin:reinvestigate` work on untrusted reports too.** Approving is the same decision as removing the `untrusted` label.
 - **Runner: a model per post-agent.** `post: { "review": "claude:opus" }` now picks the model as well as the agent.
 - The implementing agent now reads the investigation, the challenge and the maintainers' comments after them, and treats other people's comments as untrusted input.
+- **Release candidates.** A tag `vX.Y.Z-rc.N` publishes a pre-release on GitHub and the widget under npm's `next` dist-tag, without moving `v0` or `latest`. See [Updating](README.md#updating).
 
 ## 0.1.1 — 2026-11-19
 
