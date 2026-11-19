@@ -1,10 +1,19 @@
 {
   "name": "pr-goblin-widget",
-  "version": "1.3.1",
+  "version": "0.1.0",
   "description": "Drop-in feedback and bug-capture widget with AI-powered triage",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Rumi-Shamz/pr-goblin.git",
+    "directory": "widget"
+  },
+  "homepage": "https://github.com/Rumi-Shamz/pr-goblin#intake-and-widget",
+  "bugs": "https://github.com/Rumi-Shamz/pr-goblin/issues",
   "type": "module",
   "main": "./dist/pr-goblin.umd.js",
   "module": "./dist/pr-goblin.es.js",
+  "unpkg": "./dist/pr-goblin.iife.js",
+  "jsdelivr": "./dist/pr-goblin.iife.js",
   "exports": {
     ".": {
       "import": "./dist/pr-goblin.es.js",
@@ -12,14 +21,18 @@
     }
   },
   "files": [
-    "dist"
+    "dist",
+    "bugpilot-LICENSE"
   ],
   "scripts": {
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "prepack": "cp ../LICENSE LICENSE && cp ../licenses/bugpilot-LICENSE bugpilot-LICENSE",
+    "postpack": "rm -f LICENSE bugpilot-LICENSE",
+    "prepublishOnly": "pnpm test && pnpm build"
   },
   "dependencies": {
     "html2canvas": "^1.4.1"
