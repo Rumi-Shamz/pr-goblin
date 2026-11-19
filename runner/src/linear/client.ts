@@ -155,6 +155,23 @@ export class LinearClient {
   }
 
   /**
+   * Remove a label from an issue by name. Does nothing if the issue does not carry it.
+   */
+  async removeLabel(issueId: string, labelName: string): Promise<void> {
+    const data = await this.query<{ issue: { labels: { nodes: { id: string; name: string }[] } } | null }>(
+      `query ($id: String!) { issue(id: $id) { labels { nodes { id name } } } }`,
+      { id: issueId },
+    )
+    const wanted = labelName.trim().toLowerCase()
+    const label = data.issue?.labels.nodes.find(l => l.name.trim().toLowerCase() === wanted)
+    if (!label) return
+    await this.query(
+      `mutation ($id: String!, $labelId: String!) { issueRemoveLabel(id: $id, labelId: $labelId) { success } }`,
+      { id: issueId, labelId: label.id },
+    )
+  }
+
+  /**
    * Resolve a state name to its Linear ID (cached)
    */
   private async resolveStateId(teamKey: string, stateName: string): Promise<string | null> {

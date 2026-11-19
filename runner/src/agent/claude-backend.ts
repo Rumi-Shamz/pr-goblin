@@ -95,6 +95,7 @@ export const claudeBackend: AgentBackend = {
 
     const args = [
       ...(options.sandbox?.extraArgs ?? []),
+      ...(options.model ? ['--model', options.model] : []),
       '--print',
       '--output-format',
       'stream-json',

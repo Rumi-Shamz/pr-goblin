@@ -30,6 +30,8 @@ export interface SpawnOptions {
   logMetadata?: SpawnLogMetadata;
   /** Backend-specific runtime config prepared before spawn. */
   sandbox?: SandboxHandle;
+  /** Model to run, in the CLI's own naming ("opus", "gpt-5.5"). Unset: the CLI's default. */
+  model?: string;
 }
 
 export interface AgentBackend {

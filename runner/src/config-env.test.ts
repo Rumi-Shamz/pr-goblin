@@ -43,4 +43,20 @@ describe("settingsFromEnv", () => {
     })
     expect(settingsFromEnv({ GOBLIN_AGENT: "gpt", GOBLIN_MAX_CONCURRENT: "many" })).toEqual({})
   })
+
+  test("GOBLIN_REVIEW_FIRST and GOBLIN_CHALLENGE turn on the review step", () => {
+    expect(settingsFromEnv({ GOBLIN_REVIEW_FIRST: "1", GOBLIN_CHALLENGE: "claude:opus" })).toEqual({
+      reviewFirst: true,
+      challenge: "claude:opus",
+    })
+    expect(settingsFromEnv({ GOBLIN_REVIEW_FIRST: "false", GOBLIN_CHALLENGE: "off" })).toEqual({
+      reviewFirst: false,
+      challenge: "off",
+    })
+  })
+
+  test("an unrecognised GOBLIN_CHALLENGE is ignored rather than guessed at", () => {
+    expect(settingsFromEnv({ GOBLIN_CHALLENGE: "gemini" })).toEqual({})
+    expect(settingsFromEnv({ GOBLIN_CHALLENGE: "claude; rm -rf /" })).toEqual({})
+  })
 })

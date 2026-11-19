@@ -77,12 +77,20 @@ export interface GoblinDaemonConfig {
   policy?: PolicyConfig
   /** Most agents running at once. 0 or unset means no limit. */
   maxConcurrent?: number
+  /**
+   * Agent that challenges each investigation before a human sees it:
+   * "claude" | "codex", optionally with a model ("claude:opus", "codex:gpt-5.5"),
+   * or "auto" for the agent that does not implement. Unset or "off": no challenge.
+   */
+  challenge?: string
   workspace: WorkspaceConfig
   agent: AgentConfig
   polling: PollingConfig
   dashboard: DashboardConfig
   projects: ProjectConfig[]
 }
+
+const CHALLENGE_SPEC = /^(off|auto|(claude|codex)(:[\w.\-\[\]]+)?)$/
 
 const settingsProjectSchema = z.object({
   // team + linear are only needed when the source is Linear.
@@ -107,11 +115,17 @@ const settingsSchema = z.object({
     batchLabels: z.array(z.string()).optional(),
     untrustedLabel: z.string().optional(),
     investigatedLabel: z.string().optional(),
+    approvedLabel: z.string().optional(),
+    reinvestigateLabel: z.string().optional(),
     batchWindow: z.object({ startHour: z.number().min(0).max(23), endHour: z.number().min(0).max(23) }).optional(),
     batchMinCount: z.number().min(0).optional(),
     batchMaxSize: z.number().min(1).optional(),
   }).optional(),
   maxConcurrent: z.number().min(0).optional(),
+  /** Investigate and challenge every ticket; implement only after a human approves. */
+  reviewFirst: z.boolean().optional(),
+  /** "off" | "auto" | "claude" | "codex", optionally ":<model>". Default: the implementing agent with reviewFirst, else "off". */
+  challenge: z.string().regex(CHALLENGE_SPEC).optional(),
   linearApiKey: z.string().optional(),
   defaultAgent: z.enum(["codex", "claude", "auto"]).optional(),
   defaultTeam: z.string().optional(),
@@ -192,6 +206,8 @@ const DEFAULTS: GoblinDaemonConfig = {
  *   GOBLIN_LINEAR_PROJECT   Linear project slug
  *   GOBLIN_AGENT            "claude" | "codex"
  *   GOBLIN_MAX_CONCURRENT   number
+ *   GOBLIN_REVIEW_FIRST     "1" | "true" to investigate, challenge and wait for approval before any fix
+ *   GOBLIN_CHALLENGE        "off" | "auto" | "claude" | "codex", optionally ":<model>", e.g. "claude:opus"
  */
 export function settingsFromEnv(env: Record<string, string | undefined> = process.env): GoblinSettings {
   const out: GoblinSettings = {}
@@ -213,6 +229,12 @@ export function settingsFromEnv(env: Record<string, string | undefined> = proces
   if (env.GOBLIN_AGENT === "claude" || env.GOBLIN_AGENT === "codex") out.defaultAgent = env.GOBLIN_AGENT
   const max = Number(env.GOBLIN_MAX_CONCURRENT)
   if (env.GOBLIN_MAX_CONCURRENT && Number.isFinite(max) && max >= 0) out.maxConcurrent = max
+  const reviewFirst = env.GOBLIN_REVIEW_FIRST?.trim().toLowerCase()
+  if (reviewFirst === "1" || reviewFirst === "true") out.reviewFirst = true
+  else if (reviewFirst === "0" || reviewFirst === "false") out.reviewFirst = false
+  const challenge = env.GOBLIN_CHALLENGE?.trim()
+  if (challenge && CHALLENGE_SPEC.test(challenge)) out.challenge = challenge
+  else if (challenge) console.warn(`[config] ignoring GOBLIN_CHALLENGE=${challenge}: expected off, auto, claude or codex, optionally with :<model>`)
   return out
 }
 
@@ -263,8 +285,14 @@ export function loadConfig(): GoblinDaemonConfig {
       ...DEFAULT_POLICY,
       ...settings.policy,
       batchWindow: settings.policy?.batchWindow ?? DEFAULT_POLICY.batchWindow,
+      reviewFirst: settings.reviewFirst ?? DEFAULT_POLICY.reviewFirst,
     },
     maxConcurrent: settings.maxConcurrent ?? DEFAULTS.maxConcurrent,
+    // With review first and no choice made, the challenger is the implementing
+    // agent's CLI: it is the one known to be installed (in CI, only Claude is).
+    challenge: settings.challenge ?? (settings.reviewFirst
+      ? (settings.defaultAgent && settings.defaultAgent !== "auto" ? settings.defaultAgent : DEFAULTS.agent.default)
+      : undefined),
     workspace: {
       root: resolvePath(settings.workspace?.root ?? DEFAULTS.workspace.root),
     },

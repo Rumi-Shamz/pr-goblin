@@ -34,6 +34,39 @@ describe("decide", () => {
     expect(decide(item(["untrusted", "batch"]))).toMatchObject({ lane: "hold" })
   })
 
+  describe("review first", () => {
+    const cfg: PolicyConfig = { ...DEFAULT_POLICY, reviewFirst: true }
+
+    it("investigates a trusted ticket in its own lane instead of implementing it", () => {
+      expect(decide(item(["bug"]), cfg)).toMatchObject({ lane: "normal", mode: "investigate" })
+      expect(decide(item(["critical"]), cfg)).toMatchObject({ lane: "urgent", mode: "investigate" })
+      expect(decide(item(["batch:ui"]), cfg)).toMatchObject({ lane: "batch", mode: "investigate" })
+    })
+
+    it("holds an investigated ticket until a human decides", () => {
+      expect(decide(item(["goblin:investigated"]), cfg)).toMatchObject({ lane: "hold" })
+    })
+
+    it("implements once approved, in the ticket's lane", () => {
+      expect(decide(item(["goblin:investigated", "goblin:approved"]), cfg)).toMatchObject({ lane: "normal", mode: "implement" })
+      expect(decide(item(["goblin:approved", "critical"]), cfg)).toMatchObject({ lane: "urgent", mode: "implement" })
+    })
+
+    it("investigates again when asked, even if also approved", () => {
+      expect(decide(item(["goblin:investigated", "goblin:reinvestigate"]), cfg)).toMatchObject({ lane: "normal", mode: "investigate" })
+      expect(decide(item(["goblin:approved", "goblin:reinvestigate"]), cfg)).toMatchObject({ mode: "investigate" })
+    })
+
+    it("keeps untrusted tickets on the untrusted rules", () => {
+      expect(decide(item(["untrusted"]), cfg)).toMatchObject({ lane: "hold" })
+    })
+  })
+
+  it("lets a human approve or reinvestigate an untrusted ticket", () => {
+    expect(decide(item(["untrusted", "goblin:investigated", "goblin:approved"]))).toMatchObject({ lane: "normal", mode: "implement" })
+    expect(decide(item(["untrusted", "goblin:investigated", "goblin:reinvestigate"]))).toMatchObject({ lane: "normal", mode: "investigate" })
+  })
+
   it("never gives an untrusted ticket a code-writing agent, even when urgent", () => {
     expect(decide(item(["untrusted", "critical"]))).toMatchObject({ lane: "urgent", mode: "investigate" })
     expect(decide(item(["untrusted"], 1))).toMatchObject({ lane: "urgent", mode: "investigate" })

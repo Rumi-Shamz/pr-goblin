@@ -42,11 +42,33 @@ A report from the public widget is labelled `untrusted`, because its text is wri
 |---|---|
 | untrusted | Held. No agent runs until a human removes the `untrusted` label. |
 | untrusted **and** urgent | An agent investigates **read-only** and posts its findings on the ticket. No branch, no commit, no PR. Then it is held like the rest. |
-| trusted | Implemented, PR opened. |
+| trusted | Implemented, PR opened. With [review first](#review-first) on: investigated, challenged and held like an untrusted report. |
 
 Severity is set by the triage step, not by the reporter, so a stranger cannot mark their own report critical. Feature requests are never picked up automatically.
 
 Reports from your own testers can skip the `untrusted` label: your app's backend signs the tester's login with a shared secret and the widget forwards the proof. See [Trusted reporters](#trusted-reporters).
+
+### Review first
+
+Set `GOBLIN_REVIEW_FIRST=1` and no ticket is fixed until a human has read a diagnosis and approved it:
+
+```
+intake → investigate (read-only) → challenge (a second agent) → you decide → fix and PR
+                ↑                                                    │
+                └───────────── goblin:reinvestigate + your comment ──┘
+```
+
+1. **Investigate.** An agent reads the ticket and the code without changing anything and posts a **Goblin Investigation** comment: verdict, likely cause with file and line, proposed fix, risk.
+2. **Challenge.** A second agent tries to break that diagnosis: it checks each claim against the code, looks for other causes and for what the fix would break, and posts a **Goblin Challenge** comment with its own recommendation. Make it a stronger model, or the other vendor, with `GOBLIN_CHALLENGE` (for example `claude:opus`). By default it is the same CLI as the implementing agent, with that CLI's default model.
+3. **You decide**, on the ticket:
+
+   | You add | pr-goblin |
+   |---|---|
+   | `goblin:approved` | Implements the fix and opens a PR, guided by the investigation, the challenge and your comments |
+   | `goblin:reinvestigate`, with a comment saying what to look at | Investigates again, answers your comment, is challenged again, and removes the label |
+   | nothing, or closes the ticket | Nothing |
+
+The same two labels work on untrusted reports; approving one is the same decision as removing the `untrusted` label. Only comments from repository owners, members and collaborators are treated as your instructions; anyone else's comment is untrusted input like the report itself. A ticket is investigated at most 5 times. `GOBLIN_CHALLENGE` also works without review first: then it challenges the read-only investigations of urgent untrusted reports.
 
 ## Quick start: runner only, on GitHub Actions
 
@@ -108,8 +130,10 @@ Environment variables win over `~/.pr-goblin/settings.json`.
 | `GOBLIN_AGENT` | `claude` or `codex` | `claude` |
 | `GOBLIN_MAX_CONCURRENT` | Agents running at once | `2` |
 | `GOBLIN_AUTH` | `auto`, `subscription` or `api-key`; see [Agent credentials](#agent-credentials) | `auto` |
+| `GOBLIN_REVIEW_FIRST` | `1` to investigate, challenge and wait for approval before any fix; see [Review first](#review-first) | off |
+| `GOBLIN_CHALLENGE` | Agent that challenges each investigation: `claude` or `codex`, optionally with a model (`claude:opus`, `codex:gpt-5.5`), `auto` for the agent that does not implement, or `off` | the implementing agent with review first, else `off` |
 
-Lane and trust labels, the batch window and batch size are set under `policy` in `settings.json`; the defaults are in [`runner/src/kernel/policy.ts`](runner/src/kernel/policy.ts).
+In `settings.json` the same two are `"reviewFirst": true` and `"challenge": "claude:opus"`. Lane, trust and review labels (`approvedLabel`, `reinvestigateLabel`), the batch window and batch size are set under `policy`; the defaults are in [`runner/src/kernel/policy.ts`](runner/src/kernel/policy.ts).
 
 **How state is kept on each tracker**
 

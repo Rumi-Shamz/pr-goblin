@@ -128,7 +128,10 @@ export const codexBackend: AgentBackend = {
       'Spawning codex',
     );
 
-    const extraArgs = options.sandbox?.extraArgs ?? [];
+    const extraArgs = [
+      ...(options.sandbox?.extraArgs ?? []),
+      ...(options.model ? ['-c', `model=${JSON.stringify(options.model)}`] : []),
+    ];
     const proc = Bun.spawn(['codex', ...extraArgs, 'app-server', '--listen', 'stdio://'], {
       stdout: 'pipe',
       stderr: 'pipe',

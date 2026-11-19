@@ -26,6 +26,7 @@ function writeSettings(homeDir: string, settings: Record<string, unknown>): void
 const ENV_SETTING_KEYS = [
   "GOBLIN_SOURCE", "GOBLIN_REPO", "GITHUB_REPOSITORY", "GOBLIN_BASE_BRANCH", "GOBLIN_LINEAR_TEAM",
   "GOBLIN_LINEAR_PROJECT", "GOBLIN_AGENT", "GOBLIN_MAX_CONCURRENT", "LINEAR_API_KEY",
+  "GOBLIN_REVIEW_FIRST", "GOBLIN_CHALLENGE",
 ]
 const savedEnvSettings = new Map<string, string | undefined>()
 
@@ -117,5 +118,43 @@ describe("loadConfig", () => {
     expect(config.linear!.apiKey).toBe("")
     expect(config.projects).toEqual([])
     expect(existsSync(resolve(homeDir, ".pr-goblin", "settings.json"))).toBe(false)
+  })
+
+  describe("review first", () => {
+    function load(settings: Record<string, unknown>) {
+      const homeDir = createTempHome()
+      writeSettings(homeDir, settings)
+      savedHome = process.env.HOME
+      savedGoblinDir = process.env.GOBLIN_DIR
+      process.env.HOME = homeDir
+      delete process.env.GOBLIN_DIR
+      return loadConfig()
+    }
+
+    test("is off by default, with no challenge", (): void => {
+      const config = load({})
+      expect(config.policy?.reviewFirst).toBe(false)
+      expect(config.challenge).toBeUndefined()
+    })
+
+    test("turned on, the challenger defaults to the implementing agent's CLI", (): void => {
+      expect(load({ reviewFirst: true }).challenge).toBe("claude")
+      expect(load({ reviewFirst: true, defaultAgent: "codex" }).challenge).toBe("codex")
+    })
+
+    test("an explicit challenger wins, and the environment wins over settings.json", (): void => {
+      expect(load({ reviewFirst: true, challenge: "codex:gpt-5.5" }).challenge).toBe("codex:gpt-5.5")
+      process.env.GOBLIN_REVIEW_FIRST = "1"
+      process.env.GOBLIN_CHALLENGE = "claude:opus"
+      const config = load({ reviewFirst: false })
+      expect(config.policy?.reviewFirst).toBe(true)
+      expect(config.challenge).toBe("claude:opus")
+    })
+
+    test("review labels can be renamed under policy", (): void => {
+      const config = load({ policy: { approvedLabel: "ok-to-fix" } })
+      expect(config.policy?.approvedLabel).toBe("ok-to-fix")
+      expect(config.policy?.reinvestigateLabel).toBe("goblin:reinvestigate")
+    })
   })
 })

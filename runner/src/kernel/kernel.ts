@@ -103,6 +103,14 @@ function appendEvalRecord(task: Task, reason: DoneReason): void {
   } catch {}
 }
 
+/** Most investigations per ticket, so a "reinvestigate" label that cannot be removed does not loop. */
+export const MAX_INVESTIGATIONS = 5;
+
+function hasLabelCI(labels: string[], wanted: string): boolean {
+  const w = wanted.trim().toLowerCase();
+  return labels.some((l) => l.trim().toLowerCase() === w);
+}
+
 export class Kernel {
   private store: StateStore;
   private log: SessionLogger;
@@ -122,6 +130,8 @@ export class Kernel {
   lastAdmission = { held: 0, batchWaiting: 0 };
   /** Set when an agent reports a usage or rate limit: nothing is dispatched before it. */
   usagePausedUntil: number | null = null;
+  /** Tickets already warned about hitting MAX_INVESTIGATIONS, so the warning is not repeated every poll. */
+  private cappedWarned = new Set<string>();
   /** Clock, overridable in tests. */
   now: () => Date = () => new Date();
 
@@ -420,6 +430,41 @@ export class Kernel {
           this.log.event(existing.id, existing.identifier, 'promote_investigated', {});
           continue;
         }
+        if (
+          existing.state === 'done' &&
+          existing.mode === 'investigate' &&
+          decision.mode === 'investigate' &&
+          hasLabelCI(item.labels, this.policy.reinvestigateLabel)
+        ) {
+          // A human asked for more investigation (with a comment saying what to look at).
+          if ((existing.investigations ?? 1) >= MAX_INVESTIGATIONS) {
+            if (!this.cappedWarned.has(existing.id)) {
+              this.cappedWarned.add(existing.id);
+              console.warn(
+                `[kernel] ${existing.identifier} has been investigated ${existing.investigations} times; not investigating again. Remove the ${this.policy.reinvestigateLabel} label.`,
+              );
+              this.log.event(existing.id, existing.identifier, 'reinvestigate_capped', {
+                investigations: existing.investigations,
+              });
+            }
+            continue;
+          }
+          existing.state = 'queued';
+          existing.doneReason = undefined;
+          existing.labels = item.labels;
+          existing.priority = item.priority;
+          existing.description = item.description;
+          existing.worktree = undefined;
+          existing.branch = undefined;
+          existing.round = 0;
+          existing.retryCount = 0;
+          existing.updatedAt = new Date().toISOString();
+          this.store.save();
+          this.log.event(existing.id, existing.identifier, 'reinvestigate', {
+            investigations: existing.investigations ?? 1,
+          });
+          continue;
+        }
         if (existing.state === 'done' && existing.doneReason === 'failed') {
           // Failed task reappeared in poll (human moved Backlog → Todo) — start fresh.
           existing.state = 'queued';
@@ -530,7 +575,19 @@ export class Kernel {
           repoDir,
           task.baseBranch,
           false,
-          { tracker: this.source.tracker ?? 'linear', mode: task.mode ?? 'implement' },
+          task.mode === 'investigate'
+            ? {
+                tracker: this.source.tracker ?? 'linear',
+                mode: 'investigate',
+                review: {
+                  approved: this.policy.approvedLabel,
+                  reinvestigate: this.policy.reinvestigateLabel,
+                  ...(hasLabelCI(task.labels, this.policy.untrustedLabel)
+                    ? { untrusted: this.policy.untrustedLabel }
+                    : {}),
+                },
+              }
+            : { tracker: this.source.tracker ?? 'linear', mode: task.mode ?? 'implement' },
         );
         task.taskDir = info.taskDir;
         task.workDir = info.workDir;
@@ -644,8 +701,25 @@ export class Kernel {
     if (task.mode === 'investigate') {
       enrichMeta(task, result, 'investigated');
       syncHistoryIndexForTask(sanitizeTaskIdentifier(task.identifier));
+      task.investigations = (task.investigations ?? 0) + 1;
+      // A second agent tries to break the diagnosis before a human reads it.
+      // Its failure must not cost the human the investigation, so it only warns.
       try {
-        await this.source.onInvestigated?.(this.toSourceItem(task));
+        await this.runChallenge(task);
+      } catch (err) {
+        console.warn(
+          `[kernel] challenge of ${task.identifier} failed: ${err instanceof Error ? err.message : String(err)}`,
+        );
+        this.log.event(taskId, task.identifier, 'challenge_failed', {
+          error: err instanceof Error ? err.message : String(err),
+        });
+      }
+      const reinvestigate = this.policy.reinvestigateLabel;
+      try {
+        await this.source.onInvestigated?.(
+          this.toSourceItem(task),
+          hasLabelCI(task.labels, reinvestigate) ? { removeLabel: reinvestigate } : undefined,
+        );
       } catch (err) {
         console.warn(
           `[kernel] could not mark ${task.identifier} as investigated: ${err instanceof Error ? err.message : String(err)}`,
@@ -720,6 +794,37 @@ export class Kernel {
 
     // Actionable → continue
     return this.tryContinuation(task, result);
+  }
+
+  /**
+   * Run the challenge agent on a finished investigation, if one is configured.
+   * Overridable in tests. Throws when the agent fails; the caller only warns.
+   */
+  private async runChallenge(task: Task): Promise<void> {
+    const spec = this.config.challenge;
+    if (!spec || spec === 'off') return;
+    if (!task.taskDir || !task.worktree) return;
+
+    const { challengePostAgent } = await import('./post-agent/challenge');
+    const { runPostAgents } = await import('./post-agent/index');
+    const { spawnForPostAgent } = await import('./agent');
+    const agent = challengePostAgent(this.source.tracker ?? 'linear', {
+      approved: this.policy.approvedLabel,
+      reinvestigate: this.policy.reinvestigateLabel,
+      ...(hasLabelCI(task.labels, this.policy.untrustedLabel)
+        ? { untrusted: this.policy.untrustedLabel }
+        : {}),
+    });
+    this.emit({ type: 'post_agent_start', task, data: { agents: ['challenge'] } });
+    const chain = await runPostAgents(task, this.config, [agent], spawnForPostAgent, {
+      challenge: spec,
+    });
+    this.log.event(task.id, task.identifier, 'challenge_done', {
+      exitCode: chain.results[0]?.exitCode,
+    });
+    if (chain.verdict === 'fail') {
+      throw new Error(`challenge agent exited ${chain.results[0]?.exitCode}`);
+    }
   }
 
   // ── Reconcile (published task state check) ──────────────────

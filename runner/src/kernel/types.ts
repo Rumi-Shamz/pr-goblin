@@ -64,6 +64,8 @@ export interface Task {
   stage?: "implement" | "post-agent"
   /** What the agent may do. "investigate" is read-only: no commits, no PR. Defaults to "implement". */
   mode?: "implement" | "investigate"
+  /** How many read-only investigations this ticket has had. Caps repeated "investigate again" requests. */
+  investigations?: number
   doneReason?: DoneReason
 
   // Repo context

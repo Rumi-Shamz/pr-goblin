@@ -46,8 +46,10 @@ export interface Source {
   /**
    * Record on the ticket that a read-only investigation has finished, in a way
    * poll() will report back (a label), so the ticket is not investigated again.
+   * `removeLabel` is the label that asked for this investigation (a human's
+   * "investigate again"); remove it so the request is not repeated.
    */
-  onInvestigated?(item: SourceItem): Promise<void>
+  onInvestigated?(item: SourceItem, options?: { removeLabel?: string }): Promise<void>
 
   /** Detect PR URL from a worktree. Optional — only sources with VCS integration implement this. */
   detectPrUrl?(worktreeDir: string): Promise<string | undefined>

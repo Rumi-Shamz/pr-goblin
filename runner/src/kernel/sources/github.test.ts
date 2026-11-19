@@ -166,6 +166,16 @@ describe("GitHubSource lifecycle callbacks", () => {
     expect(calls[1]).toEqual(["issue", "edit", "7", "--repo", "acme/app", "--add-label", "goblin:investigated"])
   })
 
+  test("onInvestigated removes the label that asked for the investigation", async () => {
+    const { exec, calls } = fakeGh({})
+    await new GitHubSource(PROJECTS, GITHUB_DEFAULTS, exec).onInvestigated(ITEM, { removeLabel: "goblin:reinvestigate" })
+
+    expect(calls[1]).toEqual([
+      "issue", "edit", "7", "--repo", "acme/app",
+      "--add-label", "goblin:investigated", "--remove-label", "goblin:reinvestigate",
+    ])
+  })
+
   test("onInvestigated throws when the label cannot be applied", async () => {
     const { exec } = fakeGh({ "issue edit": { exitCode: 1, stdout: "", stderr: "forbidden" } })
     await expect(new GitHubSource(PROJECTS, GITHUB_DEFAULTS, exec).onInvestigated(ITEM)).rejects.toThrow("forbidden")
