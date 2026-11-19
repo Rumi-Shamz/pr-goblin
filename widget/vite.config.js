@@ -4,7 +4,7 @@ import { defineConfig } from 'vite'
 
 // The version comes from package.json, which the release workflow sets from
 // the git tag (v0.2.0 -> 0.2.0). It is also injected as __PR_GOBLIN_VERSION__.
-const WIDGET_VERSION = JSON.parse(readFileSync(resolve(__dirname, 'package.json'), 'utf8')).version
+const WIDGET_VERSION = JSON.parse(readFileSync(resolve(import.meta.dirname, 'package.json'), 'utf8')).version
 const BANNER = `/* pr-goblin-widget v${WIDGET_VERSION} */`
 
 // Prepend the version banner to every built bundle (es, umd, iife) so
@@ -31,7 +31,7 @@ const versionBanner = {
 export default defineConfig({
   build: {
     lib: {
-      entry: resolve(__dirname, 'src/index.js'),
+      entry: resolve(import.meta.dirname, 'src/index.js'),
       name: 'PrGoblin',
       formats: ['es', 'umd', 'iife'],
       // Single default export — IIFE exposes window.PrGoblin directly
