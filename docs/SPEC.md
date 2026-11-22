@@ -1,6 +1,6 @@
 # pr-goblin: specification and status
 
-Last updated 2026-11-19.
+Last updated 2026-11-22.
 
 ## Goal
 
@@ -11,8 +11,9 @@ A module you plug into a project so that issues reported by users and testers ar
 | Decision | Choice | Why |
 |---|---|---|
 | Language | TypeScript throughout | The widget must be browser code; Linear's and GitHub's tooling is native to it |
-| Trigger | Polling, not webhooks | No relay server to deploy; a few seconds to minutes of delay is the cost |
+| Trigger | Polling, not webhooks, for the daemon. In CI, the reusable workflow starts on issue label events plus an hourly sweep, and each run still polls once | No relay server to deploy. A `*/15` cron bills at least a minute per run even with no tickets (about 2,900 minutes a month on a private repo, over the free 2,000), so CI mode lets GitHub deliver the label event and keeps polling only as a slow sweep |
 | Where the runner runs | Both a long-running daemon and a one-shot CI job | Same code path: the daemon loops what `goblin once` does once |
+| CI wiring | One reusable workflow (`goblin-runner.yml`) that repos call from a thin workflow; it checks out the runner at its own commit | Repos stopped carrying hand-copied, drifting workflows; one pin upgrades both. Credentials are passed explicitly; an optional GitHub App replaces the token |
 | Coding agent | Shell out to Claude Code or Codex | The agent is not the product; a better agent should drop in |
 | Intake | Short form, automatic context capture, model fills gaps | Research on chat vs form intake is thin; unstructured chat lowers report quality |
 | Lanes | Urgent now, batch in a window, normal on next poll | Critical work should not wait; cosmetic work should not interrupt |
@@ -31,6 +32,7 @@ A module you plug into a project so that issues reported by users and testers ar
 | Runner: review first, challenge agent, approve / reinvestigate labels | yes | 6 kernel, 6 policy, 3 challenge rules, 2 rules, 6 config, 1 GitHub source |
 | Runner: model per post-agent (`claude:opus`) | yes | 2 (parsing only; the `--model` / `-c model=` flags are not exercised) |
 | Runner: `goblin once` for CI, config from environment variables | yes | yes |
+| Reusable CI workflows (`goblin-runner.yml`, `goblin-lock.yml`) and thin example callers | yes | 14 workflow-text checks in `example-workflow.test.ts` (SHA pins, triggers, no sub-hourly cron, identity); run on GitHub with fake credentials as far as the git-identity step |
 | Runner: concurrency cap | yes | yes |
 | Intake: GitHub target (from bugpilot) | yes | yes |
 | Intake: Linear target | yes | 6, against a faked Linear API |
@@ -45,7 +47,7 @@ A module you plug into a project so that issues reported by users and testers ar
 | Tagged releases, `v0` major tag, widget on npm with provenance | yes | ran for v0.1.1; release candidates (`-rc.N` → npm `next`) not yet run |
 | Triage action (from bugpilot) | yes, unchanged apart from naming | 33 |
 
-Test totals at this commit: runner 388, intake 82, widget 97, triage 33.
+Test totals at this commit: runner 399, intake 82, widget 97, triage 33.
 
 ## What has not been verified
 
@@ -53,7 +55,7 @@ Be clear about these before relying on it.
 
 1. **No end-to-end run.** No real ticket has yet gone through a real agent to a real PR with this code. The runner's kernel is tested with a fake agent and fake tracker.
 2. **Linear calls are untested against the live API.** Intake's issue creation (team lookup, label creation, project lookup by `slugId`) and the runner's `addLabel` were written from the API schema and tested only against fakes.
-3. **`examples/goblin.yml` has not been run in GitHub Actions.** In particular: agent authentication in CI, and `gh auth setup-git` being enough for the runner's clone and push.
+3. **The reusable runner workflow has not completed a real run in GitHub Actions.** A run with fake credentials got as far as the git-identity step: checkout at the workflow's own commit, Bun, pnpm, Node and the agent install all worked. Not exercised: agent authentication in CI, `gh auth setup-git` being enough for the runner's clone and push, the label-event trigger, the hourly sweep, and the GitHub App token path.
 4. **Investigate mode is enforced by instructions only.** See the threat model.
 5. **`goblin once` was smoke-tested live only on the empty path** (poll a real repo, find nothing, exit 0).
 6. **`goblin init` is still the Linear-only wizard** inherited from reeve.

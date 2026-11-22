@@ -1,0 +1,40 @@
+# Reusable: locks pr-goblin issues so only collaborators can comment on them.
+# Call it from an `issues: [opened, labeled]` workflow (examples/goblin-lock.yml).
+#
+# pr-goblin's agent reads an issue's comments as well as its body when it works a
+# `goblin` issue. On a public repo, without the lock any GitHub user could add
+# instructions to a trusted report. Collaborators (including the token owner the
+# runner acts as) can still comment on locked issues.
+#
+# Runs whether or not the runner is enabled; it only locks conversations. It acts on
+# the issue in the caller's event, so the caller's job needs `permissions: issues: write`.
+
+name: pr-goblin lock
+
+on:
+  workflow_call:
+
+permissions: {}
+
+jobs:
+  lock:
+    if: >-
+      github.event_name == 'issues' &&
+      !github.event.issue.locked && (
+        contains(github.event.issue.labels.*.name, 'goblin') ||
+        contains(github.event.issue.labels.*.name, 'user-feedback')
+      )
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+    steps:
+      - name: Lock the conversation
+        # An issue filed with labels fires `opened` plus one `labeled` per label,
+        # so several runs race; losing the race (already locked) is success.
+        run: |
+          locked() { [ "$(gh issue view "$NUMBER" --repo "$REPO" --json locked -q .locked)" = "true" ]; }
+          locked || gh issue lock "$NUMBER" --repo "$REPO" || locked
+        env:
+          GH_TOKEN: ${{ github.token }}
+          NUMBER: ${{ github.event.issue.number }}
+          REPO: ${{ github.repository }}

@@ -1,0 +1,220 @@
+# Reusable pr-goblin runner for GitHub Actions. Call it from a thin workflow in
+# your repo (examples/goblin.yml); do not copy this file.
+#
+# One run polls the tracker once, works the tickets that are due, opens PRs, and
+# exits. Nothing is kept between runs: progress lives on the ticket and the branch.
+#
+# Which pr-goblin code runs: the same commit as this workflow file. The caller
+# pins the workflow (`...goblin-runner.yml@v0.2.0` or `@<sha>`) and the first
+# step checks pr-goblin out at `job.workflow_sha`, which GitHub sets to the commit
+# of the reusable workflow file (the caller's own commit is `github.workflow_sha`).
+# So one pin controls both the workflow and the runner code.
+#
+# Credentials are passed explicitly by the caller (never `secrets: inherit`):
+#   GOBLIN_GH_TOKEN          fine-grained PAT for the caller's repo: Contents, Issues,
+#                            Pull requests read/write. The built-in GITHUB_TOKEN is
+#                            refused on purpose: PRs it opens do not trigger CI, and
+#                            its commits are authored by github-actions[bot].
+#   GOBLIN_APP_PRIVATE_KEY   private key of a GitHub App, used with the `app-id` input
+#                            instead of GOBLIN_GH_TOKEN. The token is minted per run,
+#                            scoped to the calling repo, and revoked when the job ends.
+#   ANTHROPIC_API_KEY        agent credential, pay per use
+#   CLAUDE_CODE_OAUTH_TOKEN  agent credential, a Claude subscription (`claude setup-token`)
+#                            Either one is enough; if both are set the API key wins.
+#   LINEAR_API_KEY           only when the tracker is Linear
+
+name: pr-goblin runner
+
+on:
+  workflow_call:
+    inputs:
+      base-branch:
+        description: Branch that PRs target.
+        type: string
+        default: main
+      source:
+        description: 'Tracker: github (Issues on the calling repo) or linear.'
+        type: string
+        default: github
+      max-concurrent:
+        description: Tickets worked at the same time.
+        type: string
+        default: '1'
+      node-version:
+        description: Node.js version for the agent, so it can install and build the calling repo.
+        type: string
+        default: '20'
+      pnpm-version:
+        description: Install this pnpm version (for example '9'). Empty skips pnpm.
+        type: string
+        default: ''
+      app-id:
+        description: >-
+          ID of a GitHub App installed on the calling repo (Contents, Issues, Pull requests:
+          read/write). When set, a token is minted from the GOBLIN_APP_PRIVATE_KEY secret and
+          GOBLIN_GH_TOKEN is not used.
+        type: string
+        default: ''
+      review-first:
+        description: Set to '1' to investigate and challenge every ticket first (GOBLIN_REVIEW_FIRST).
+        type: string
+        default: ''
+      challenge:
+        description: Agent and model that challenges investigations, for example claude:opus (GOBLIN_CHALLENGE).
+        type: string
+        default: ''
+      linear-team:
+        description: Linear team key (source linear only).
+        type: string
+        default: ''
+      linear-project:
+        description: Linear project slug (source linear only).
+        type: string
+        default: ''
+    secrets:
+      GOBLIN_GH_TOKEN:
+        description: Fine-grained token for the calling repo. Needed unless app-id is set.
+        required: false
+      GOBLIN_APP_PRIVATE_KEY:
+        description: GitHub App private key. Needed when app-id is set.
+        required: false
+      ANTHROPIC_API_KEY:
+        description: Agent credential (API key). Either this or CLAUDE_CODE_OAUTH_TOKEN; the key wins when both are set.
+        required: false
+      CLAUDE_CODE_OAUTH_TOKEN:
+        description: Agent credential (Claude subscription token).
+        required: false
+      LINEAR_API_KEY:
+        description: Linear personal API key (source linear only).
+        required: false
+
+permissions:
+  contents: read
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    # One run at a time per caller repo, so two runs never pick up the same ticket.
+    # A run that arrives while one is working waits; a newer waiting run replaces an
+    # older waiting one, which is fine because every run polls the whole queue.
+    # This lives here, at job level, so a caller's skipped runs never enter the group.
+    concurrency:
+      group: pr-goblin-${{ github.repository }}
+      cancel-in-progress: false
+    steps:
+      - name: Check credentials
+        env:
+          APP_ID: ${{ inputs.app-id }}
+          SOURCE: ${{ inputs.source }}
+          HAS_GH_TOKEN: ${{ secrets.GOBLIN_GH_TOKEN != '' }}
+          HAS_APP_KEY: ${{ secrets.GOBLIN_APP_PRIVATE_KEY != '' }}
+          HAS_API_KEY: ${{ secrets.ANTHROPIC_API_KEY != '' }}
+          HAS_OAUTH: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN != '' }}
+          HAS_LINEAR: ${{ secrets.LINEAR_API_KEY != '' }}
+        run: |
+          fail=0
+          if [ -n "$APP_ID" ]; then
+            if [ "$HAS_APP_KEY" != "true" ]; then
+              echo "::error::app-id is set but the GOBLIN_APP_PRIVATE_KEY secret is missing."
+              fail=1
+            fi
+          elif [ "$HAS_GH_TOKEN" != "true" ]; then
+            echo "::error::Set the GOBLIN_GH_TOKEN secret (or the app-id input and GOBLIN_APP_PRIVATE_KEY), and pass it in the caller's secrets: block."
+            fail=1
+          fi
+          if [ "$HAS_API_KEY" != "true" ] && [ "$HAS_OAUTH" != "true" ]; then
+            echo "::error::Set ANTHROPIC_API_KEY or CLAUDE_CODE_OAUTH_TOKEN (Claude subscription), and pass it in the caller's secrets: block."
+            fail=1
+          fi
+          if [ "$SOURCE" = "linear" ] && [ "$HAS_LINEAR" != "true" ]; then
+            echo "::error::source is linear but the LINEAR_API_KEY secret is missing."
+            fail=1
+          fi
+          exit "$fail"
+
+      - name: Mint a token from the GitHub App
+        id: app-token
+        if: inputs.app-id != ''
+        uses: actions/create-github-app-token@f418cff399f7aef4c2f0ad47e25ca7a6abbdd6fc # v3.4.0
+        with:
+          app-id: ${{ inputs.app-id }}
+          private-key: ${{ secrets.GOBLIN_APP_PRIVATE_KEY }}
+          # Defaults: the calling repository only, owned by the calling repo's owner.
+          permission-contents: write
+          permission-issues: write
+          permission-pull-requests: write
+
+      - name: Get pr-goblin
+        # Same repository and commit as this workflow file; see the header.
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          repository: ${{ job.workflow_repository }}
+          ref: ${{ job.workflow_sha }}
+          path: pr-goblin
+          persist-credentials: false
+
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+
+      # pnpm before Node, so the agent can install and build the calling repo to check its change.
+      - name: Install pnpm
+        if: inputs.pnpm-version != ''
+        uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
+        with:
+          version: ${{ inputs.pnpm-version }}
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: ${{ inputs.node-version }}
+
+      - name: Install the runner and the coding agent
+        run: |
+          cd pr-goblin/runner && bun install --frozen-lockfile
+          npm install -g @anthropic-ai/claude-code
+
+      - name: Git identity for the agent's commits
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token || secrets.GOBLIN_GH_TOKEN }}
+          APP_SLUG: ${{ steps.app-token.outputs.app-slug }}
+        run: |
+          # Commit as the token's owner (id-prefixed noreply address). A bare
+          # pr-goblin@users.noreply.github.com belongs to a stranger's account,
+          # and hosts like Vercel refuse to deploy commits by authors outside the
+          # team. No fallback to github-actions[bot]: if the identity cannot be
+          # resolved, fail here instead of committing as the wrong author.
+          if [ -n "$APP_SLUG" ]; then
+            # An App token has no user; its commits belong to the App's bot account.
+            login="${APP_SLUG}[bot]"
+            id=$(gh api "/users/${login}" --jq .id)
+          else
+            owner=$(gh api user -q '"\(.id) \(.login)"')
+            read -r id login <<<"$owner"
+          fi
+          git config --global user.name "$login"
+          git config --global user.email "$id+$login@users.noreply.github.com"
+          gh auth setup-git
+
+      - name: Work the queue
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token || secrets.GOBLIN_GH_TOKEN }}
+          # Agent credentials. When both are set the API key wins.
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          # Tracker. GitHub Issues on the calling repo unless source is linear.
+          GOBLIN_SOURCE: ${{ inputs.source }}
+          GOBLIN_REPO: ${{ github.repository }}
+          GOBLIN_BASE_BRANCH: ${{ inputs.base-branch }}
+          GOBLIN_AGENT: claude
+          GOBLIN_MAX_CONCURRENT: ${{ inputs.max-concurrent }}
+          LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}
+          GOBLIN_LINEAR_TEAM: ${{ inputs.linear-team }}
+          GOBLIN_LINEAR_PROJECT: ${{ inputs.linear-project }}
+          GOBLIN_REVIEW_FIRST: ${{ inputs.review-first }}
+          GOBLIN_CHALLENGE: ${{ inputs.challenge }}
+        run: |
+          # A credential that was not passed arrives as an empty string. Remove it, so
+          # the agent sees an unset variable rather than an empty one.
+          for v in ANTHROPIC_API_KEY CLAUDE_CODE_OAUTH_TOKEN LINEAR_API_KEY; do
+            [ -n "${!v}" ] || unset "$v"
+          done
+          bun pr-goblin/runner/src/cli/app.ts once --timeout 50

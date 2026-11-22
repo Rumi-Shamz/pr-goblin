@@ -20,7 +20,7 @@ It never merges. Every fix arrives as a pull request for a human to review, and 
 | `widget/` | Feedback button and form. Captures URL, browser, viewport, an optional screenshot, and the page's recent console and network errors. | In your web app |
 | `intake/` | One HTTP endpoint that turns a report into a ticket. Holds the tracker token so the browser never sees it. | Cloudflare Worker or any Node 20+ server |
 | `actions/triage/` | GitHub Action: classifies a new report, assesses severity, drafts a fix plan as a comment. | GitHub Actions |
-| `runner/` | Polls the tracker, runs a coding agent (Claude Code or Codex) in an isolated git worktree per ticket, opens a PR. | A machine you keep running, or a scheduled CI job |
+| `runner/` | Polls the tracker, runs a coding agent (Claude Code or Codex) in an isolated git worktree per ticket, opens a PR. | A machine you keep running, or a CI job |
 
 Use all four, or only the runner against tickets you write by hand.
 
@@ -77,13 +77,49 @@ Needs no server and no settings file. Copy [`examples/goblin.yml`](examples/gobl
 | Secret | Why |
 |---|---|
 | `ANTHROPIC_API_KEY` **or** `CLAUDE_CODE_OAUTH_TOKEN` | The coding agent: an API key, or your Claude subscription (see [Agent credentials](#agent-credentials)) |
-| `GOBLIN_GH_TOKEN` | A fine-grained token for this repo: Contents, Issues and Pull requests read/write. The built-in `GITHUB_TOKEN` also works, but PRs it opens do not trigger your CI. |
+| `GOBLIN_GH_TOKEN` | A fine-grained token for this repo: Contents, Issues and Pull requests read/write. The built-in `GITHUB_TOKEN` is not accepted: PRs it opens do not trigger your CI, and its commits are authored by `github-actions[bot]`, which hosts such as Vercel refuse to deploy. To use a GitHub App instead of a token, see [GitHub App](#github-app). |
 
-Then put the `goblin` label on an issue. To use Linear as the tracker instead, add `LINEAR_API_KEY`, `GOBLIN_LINEAR_TEAM` and `GOBLIN_LINEAR_PROJECT`.
+Then set the repository variable `GOBLIN_ENABLED` to `true` (nothing runs until you do) and put the `goblin` label on an issue. To use Linear as the tracker instead, add `LINEAR_API_KEY`, `GOBLIN_LINEAR_TEAM` and `GOBLIN_LINEAR_PROJECT`.
 
-Scheduled workflows on GitHub run at most every 5 minutes and are often late. For an urgent lane that is actually fast, run the runner as a daemon.
+The example is a thin caller of the reusable workflow [`goblin-runner.yml`](.github/workflows/goblin-runner.yml). A run starts when a `goblin` label is added to an issue, when you press *Run workflow*, and on an hourly sweep. Each run polls once, works the tickets that are due, opens PRs, and exits.
 
-The example workflow fetches pr-goblin at the tag `v0`, which follows the latest 0.x release. See [Updating](#updating).
+For a public repo, also copy [`examples/goblin-lock.yml`](examples/goblin-lock.yml): the agent reads an issue's comments, so the issue is locked to collaborators.
+
+**What triggers a run, and what it costs.** On a private repo every run bills at least one Actions minute, even when it finds no tickets. A `*/15` cron is about 2,900 runs a month, more than the 2,000 free minutes, so the example does not poll that fast. Label events cost nothing while idle. The hourly sweep (about 720 runs a month, each a minute or two) is what resumes a ticket that was paused for a usage limit or cut off by the run's 50-minute limit; make it rarer or remove it if you can live without that. Scheduled workflows are disabled by GitHub after 60 days without repository activity on a public repo; the label trigger is not affected. The runner as a daemon still polls every 30 seconds.
+
+The example pins the reusable workflow at the tag `v0`, which follows the latest 0.x release. See [Updating](#updating).
+
+### The reusable workflow
+
+`Rumi-Shamz/pr-goblin/.github/workflows/goblin-runner.yml@<ref>` runs one `goblin once` pass. Inputs (all optional) and secrets:
+
+| Input | Default | Meaning |
+|---|---|---|
+| `base-branch` | `main` | Branch that PRs target |
+| `source` | `github` | `github` (Issues on the calling repo) or `linear` |
+| `max-concurrent` | `1` | Tickets worked at the same time |
+| `node-version` | `20` | Node.js for the agent, so it can build your repo |
+| `pnpm-version` | none | Install this pnpm (`'9'`); empty skips pnpm |
+| `app-id` | none | ID of a [GitHub App](#github-app); mints the token instead of `GOBLIN_GH_TOKEN` |
+| `review-first`, `challenge` | none | `GOBLIN_REVIEW_FIRST`, `GOBLIN_CHALLENGE`; see [Review first](#review-first) |
+| `linear-team`, `linear-project` | none | `GOBLIN_LINEAR_TEAM`, `GOBLIN_LINEAR_PROJECT` (Linear only) |
+
+| Secret | Meaning |
+|---|---|
+| `GOBLIN_GH_TOKEN` | Fine-grained token for the calling repo; needed unless `app-id` is set |
+| `GOBLIN_APP_PRIVATE_KEY` | The App's private key; needed with `app-id` |
+| `ANTHROPIC_API_KEY`, `CLAUDE_CODE_OAUTH_TOKEN` | The agent: either one; the API key wins when both are set |
+| `LINEAR_API_KEY` | Linear only |
+
+Secrets are passed one by one in the caller's `secrets:` block; `secrets: inherit` is not used, so the runner sees only what you hand it. The run fails at the first step, naming the missing secret, when the credentials are incomplete.
+
+The workflow runs at most one pass at a time per repo (job-level `concurrency`), so it must not share a `concurrency` group with the caller. The `if:` in the caller, not the reusable workflow, holds the `GOBLIN_ENABLED` gate and the label filter, so runs that are skipped there cost nothing and never queue.
+
+**Which pr-goblin code runs.** The workflow checks pr-goblin out at the commit of the workflow file itself (`job.workflow_sha` in the reusable workflow), not at the caller's commit. The ref after `@` in your caller is therefore the only pin: `@v0` gets the latest 0.x release, `@v0.2.0` or a commit SHA pins workflow and runner together.
+
+### GitHub App
+
+A GitHub App replaces the personal token, which is tied to one person's account. Create an App with repository permissions Contents, Issues and Pull requests set to read and write, install it on the repos that run pr-goblin, store its private key as the secret `GOBLIN_APP_PRIVATE_KEY` and its ID as the variable `GOBLIN_APP_ID`. In your caller, add `app-id: ${{ vars.GOBLIN_APP_ID }}` and pass `GOBLIN_APP_PRIVATE_KEY` instead of `GOBLIN_GH_TOKEN` (both lines are in the example, commented out). Each run mints a token for the calling repo only, with just those three permissions, and revokes it when the job ends. PRs opened with it trigger your CI. Commits are authored by the App's bot account (`<app>[bot]`), which hosts that only deploy commits by team members may refuse. The App path has not been run against a real App yet.
 
 ## Quick start: runner as a daemon
 
@@ -111,7 +147,7 @@ The runner never handles the agent's credentials: it starts `claude` or `codex`,
 
 **An API key takes precedence.** If `ANTHROPIC_API_KEY` is set anywhere in the runner's environment, Claude Code uses it even when you are signed in, so usage is billed to the key. The runner warns when this happens. Set `GOBLIN_AUTH=subscription` to remove the agent's API keys from its environment, or `GOBLIN_AUTH=api-key` to require one.
 
-**Usage limits.** A subscription has rolling caps. When the agent reports one (or an API rate limit), the ticket goes back in the queue for after the stated reset, without counting as a failed attempt, and nothing else is dispatched until then. In CI, `goblin once` stops early and a later scheduled run picks the ticket up.
+**Usage limits.** A subscription has rolling caps. When the agent reports one (or an API rate limit), the ticket goes back in the queue for after the stated reset, without counting as a failed attempt, and nothing else is dispatched until then. In CI, `goblin once` stops early and a later run (the hourly sweep in the example) picks the ticket up.
 
 Subscriptions are licensed for one person's own use. Running the agent unattended on your own repositories fits that; a runner shared by a team should use an API key. The triage action calls the Claude API directly and always needs an API key.
 
@@ -231,7 +267,7 @@ Every part is versioned together, by git tags `vX.Y.Z`, with notes in [CHANGELOG
 
 | You use | You get a new release | To control it |
 |---|---|---|
-| `examples/goblin.yml` or `examples/triage.yml` | On the next run, if you reference `v0` (the default) | Pin an exact tag (`v0.1.0`) or a commit SHA, and let Dependabot propose bumps |
+| `examples/goblin.yml`, `examples/goblin-lock.yml` or `examples/triage.yml` | On the next run, if you reference `v0` (the default). For `goblin.yml` the ref after `@` pins the workflow and the runner code together | Pin an exact tag (`v0.1.0`) or a commit SHA, and let Dependabot propose bumps |
 | The runner as a daemon | When you `git pull` (or `git checkout v0.2.0`) and restart | — |
 | The widget from npm (`pr-goblin-widget`) | When you run `npm update` (a `^0.1.0` range takes patch releases only) | Your package.json range and lockfile |
 | The widget from a CDN (`cdn.jsdelivr.net/npm/pr-goblin-widget@0/…`) | Within hours of a release, as the CDN cache expires | Pin an exact version in the URL (`@0.1.0`) |
