@@ -1,0 +1,7 @@
+# actionlint 1.7.12 does not know the `job.workflow_sha` / `job.workflow_repository`
+# properties yet (documented in GitHub's contexts reference, and exercised by the
+# runner workflow). Drop these entries once actionlint learns them.
+paths:
+  .github/workflows/goblin-runner.yml:
+    ignore:
+      - 'property "workflow_(sha|repository)" is not defined in object type'

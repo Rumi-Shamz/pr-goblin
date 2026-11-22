@@ -1,0 +1,21 @@
+# Locks pr-goblin issues so only collaborators can comment on them.
+# Copy to .github/workflows/goblin-lock.yml in your repo. Use it on a PUBLIC repo:
+# pr-goblin's agent reads an issue's comments as well as its body, so without the
+# lock any GitHub user could add instructions to a trusted report. On a private
+# repo only your own team can comment anyway.
+#
+# Runs whether or not the runner is enabled; it only locks conversations.
+
+name: pr-goblin lock
+
+on:
+  issues:
+    types: [opened, labeled]
+
+permissions: {}
+
+jobs:
+  lock:
+    permissions:
+      issues: write
+    uses: Rumi-Shamz/pr-goblin/.github/workflows/goblin-lock.yml@v0

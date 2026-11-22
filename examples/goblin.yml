@@ -1,85 +1,76 @@
-# pr-goblin runner on a schedule. Copy to .github/workflows/goblin.yml in your repo.
+# pr-goblin runner on GitHub Actions. Copy to .github/workflows/goblin.yml in your repo.
 #
-# Each run polls once, works the tickets that are due, opens PRs, and exits.
-# Nothing is kept between runs: progress lives on the ticket and the branch.
+# This is a thin caller: the work is done by the reusable workflow in pr-goblin,
+# which also checks out the pr-goblin code at the same commit as that workflow.
+# So the ref after `@` below is the only version pin.
 #
+# A run polls once, works the tickets that are due, opens PRs, and exits. It starts:
+#   - when a `goblin` label is added to an issue (also `goblin:approved` and
+#     `goblin:reinvestigate` for review first, and removing `untrusted`),
+#   - by hand (Actions -> pr-goblin -> Run workflow),
+#   - on the hourly sweep below, which resumes tickets that were paused for a usage
+#     limit or cut off by the 50-minute run limit.
+#
+# Cost: on a private repo every run bills at least one Actions minute, even with no
+# tickets. A `*/15` schedule is ~2,900 minutes a month, more than the free 2,000.
+# Label events cost nothing while idle; the hourly sweep is ~720 runs a month, each
+# a minute or two. Make the sweep rarer (`17 */6 * * *`) or delete it if you do not
+# need resuming. On a public repo, GitHub disables scheduled workflows after 60 days
+# without repo activity; the label trigger keeps working.
+#
+# Off until the repository variable GOBLIN_ENABLED is "true" (Settings -> Secrets and
+# variables -> Actions -> Variables). Set it to anything else to stop all runs.
 
 name: pr-goblin
 
 on:
-  schedule:
-    - cron: '*/15 * * * *'   # GitHub's minimum is 5 minutes, and runs are often late
+  issues:
+    types: [labeled, unlabeled]
   workflow_dispatch:
-
-# One run at a time, so two runs never pick up the same ticket.
-concurrency:
-  group: pr-goblin
-  cancel-in-progress: false
+  schedule:
+    - cron: '17 * * * *'   # hourly sweep; GitHub runs it a few minutes late at times
 
 permissions:
-  contents: write
-  issues: write
-  pull-requests: write
+  contents: read
 
 jobs:
-  run:
-    runs-on: ubuntu-latest
-    timeout-minutes: 60
-    steps:
-      - name: Get pr-goblin
-        uses: actions/checkout@v4
-        with:
-          repository: Rumi-Shamz/pr-goblin
-          # v0 follows the latest 0.x release. Pin an exact release (v0.1.0) or a
-          # commit SHA to upgrade only when you choose. Never use main: it would
-          # run unreleased code with write access to your repo.
-          ref: v0
-          path: pr-goblin
-
-      - uses: oven-sh/setup-bun@v2
-
-      - name: Install the runner and the coding agent
-        run: |
-          cd pr-goblin/runner && bun install --frozen-lockfile
-          npm install -g @anthropic-ai/claude-code
-
-      - name: Git identity for the agent's commits
-        run: |
-          # Commit as the token's owner. A made-up noreply address such as
-          # pr-goblin@users.noreply.github.com belongs to whichever GitHub account
-          # has that login, and hosts like Vercel refuse to deploy commits by
-          # authors outside the team. The built-in token has no user, so it
-          # falls back to the github-actions bot.
-          if owner=$(gh api user -q '"\(.id) \(.login)"' 2>/dev/null); then
-            read -r id login <<<"$owner"
-            git config --global user.name "$login"
-            git config --global user.email "$id+$login@users.noreply.github.com"
-          else
-            git config --global user.name "github-actions[bot]"
-            git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          fi
-          gh auth setup-git
-        env:
-          GH_TOKEN: ${{ secrets.GOBLIN_GH_TOKEN || github.token }}
-
-      - name: Work the queue
-        run: bun pr-goblin/runner/src/cli/app.ts once --timeout 50
-        env:
-          # A token of your own makes the PRs trigger your CI; the built-in one does not.
-          GH_TOKEN: ${{ secrets.GOBLIN_GH_TOKEN || github.token }}
-          # Agent credentials: set ONE of these two secrets.
-          #   ANTHROPIC_API_KEY        pay per use (Console API key)
-          #   CLAUDE_CODE_OAUTH_TOKEN  your Claude Pro/Max subscription, from `claude setup-token`
-          # When both are set the API key wins. A subscription has usage caps: when one
-          # is hit, tickets stay queued and a later run picks them up after the reset.
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-          CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
-          # Tracker: GitHub Issues on this repo by default. For Linear, set these three:
-          LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}
-          GOBLIN_LINEAR_TEAM: ${{ vars.GOBLIN_LINEAR_TEAM }}
-          GOBLIN_LINEAR_PROJECT: ${{ vars.GOBLIN_LINEAR_PROJECT }}
-          # Review first: set the repository variable GOBLIN_REVIEW_FIRST to 1 to have every
-          # ticket investigated and challenged, and fixed only after you add `goblin:approved`.
-          # GOBLIN_CHALLENGE picks the challenger, e.g. claude:opus. See README "Review first".
-          GOBLIN_REVIEW_FIRST: ${{ vars.GOBLIN_REVIEW_FIRST }}
-          GOBLIN_CHALLENGE: ${{ vars.GOBLIN_CHALLENGE }}
+  goblin:
+    if: >-
+      vars.GOBLIN_ENABLED == 'true' && (
+        github.event_name != 'issues' ||
+        (github.event.action == 'labeled' && startsWith(github.event.label.name, 'goblin')) ||
+        (github.event.action == 'unlabeled' && github.event.label.name == 'untrusted')
+      )
+    # v0 follows the latest 0.x release. Pin an exact release (v0.2.0) or a commit SHA
+    # to upgrade only when you choose. Never use main: it would run unreleased code
+    # with write access to your repo.
+    uses: Rumi-Shamz/pr-goblin/.github/workflows/goblin-runner.yml@v0
+    with:
+      base-branch: main
+      # Review first: set the repository variable GOBLIN_REVIEW_FIRST to 1 to have every
+      # ticket investigated and challenged, and fixed only after you add `goblin:approved`.
+      # GOBLIN_CHALLENGE picks the challenger, e.g. claude:opus. See README "Review first".
+      review-first: ${{ vars.GOBLIN_REVIEW_FIRST }}
+      challenge: ${{ vars.GOBLIN_CHALLENGE }}
+      # Tracker: GitHub Issues on this repo by default. For Linear, also add the
+      # LINEAR_API_KEY secret below and set:
+      # source: linear
+      # linear-team: ${{ vars.GOBLIN_LINEAR_TEAM }}
+      # linear-project: ${{ vars.GOBLIN_LINEAR_PROJECT }}
+      # Needs Node or pnpm to build your repo? node-version: '22'  pnpm-version: '9'
+      #
+      # GitHub App instead of a token (see README "GitHub App"): set the app's ID and
+      # replace GOBLIN_GH_TOKEN below with GOBLIN_APP_PRIVATE_KEY.
+      # app-id: ${{ vars.GOBLIN_APP_ID }}
+    secrets:
+      # A token of your own makes the PRs trigger your CI; the built-in one does not.
+      GOBLIN_GH_TOKEN: ${{ secrets.GOBLIN_GH_TOKEN }}
+      # GOBLIN_APP_PRIVATE_KEY: ${{ secrets.GOBLIN_APP_PRIVATE_KEY }}
+      # Agent credentials: set ONE of these two secrets. When both are set the API key wins.
+      #   ANTHROPIC_API_KEY        pay per use (Console API key)
+      #   CLAUDE_CODE_OAUTH_TOKEN  your Claude Pro/Max subscription, from `claude setup-token`
+      # A subscription has usage caps: when one is hit, tickets stay queued and the next
+      # sweep picks them up after the reset.
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+      # LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}
